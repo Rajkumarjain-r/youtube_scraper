@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block head %}
+
+<title>Search Page</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+{% endblock %}
+
+{% block body %}
+<div class="content">
+    <h1 style="text-align: center">Physics wallah youtube channel analysis</h1>
+
+    <div class="form">
+        <form action="/pw-youtube" method="POST">
+           <!-- <input type="text" name="content" id="content"> //-->
+            <input type="submit" value="Analyse">
+        </form>
+    </div>
+</div>
+{% endblock %}

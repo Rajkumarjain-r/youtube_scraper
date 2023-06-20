@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  <meta charset="UTF-8">
+  <title>Review Page</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
+
+
+      <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+
+</head>
+
+<body>
+
+  <div class="table-users">
+   <div class="header">PW Youtube Channel analysis</div>
+
+   <table cellspacing="0">
+      <tr>
+         <th>Video Title</th>
+         <th>Youtube url</th>
+         <th>No of views</th>
+         <th>Posted on</th>
+         <th>Thumbnail </th>
+      </tr>
+         {% for result in results %}
+      <tr>
+          <td>{{result['Video Title']}}</td>
+         <td>{{result['Youtube url']}}</td>
+         <td>{{result['No of views']}}</td>
+         <td>{{result['Posted on']}}</td>
+         <td>{{result['Thumbnail']}} </td>
+       {% endfor %}
+   </table>
+</div>
+
+
+
+</body>
+
+</html>
