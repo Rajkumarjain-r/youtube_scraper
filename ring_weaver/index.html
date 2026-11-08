@@ -1,0 +1,820 @@
+<title>Ring Weaver</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Familjen+Grotesk:wght@400;600&display=swap">
+<style>
+  /* Layout: one full-bleed canvas (the machine room), a thin brass HUD strip on top, and a card overlay for title / game over. Single dark look by choice. */
+  :root {
+    color-scheme: dark;
+    --soot: #0b0f15;
+    --soot-raised: #151b25;
+    --brass: #d4ab57;
+    --brass-dim: #7a6232;
+    --ink: #efe7d4;
+    --ink-dim: #a39b86;
+    --danger: #ff5b3d;
+    --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+    --font-body: "Familjen Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--soot); color: var(--ink); font-family: var(--font-body); }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 2; pointer-events: none;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid; grid-template-columns: 1fr minmax(120px, 280px) 1fr; align-items: start; gap: 16px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .stat.right { align-items: flex-end; text-align: right; }
+  .label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+  .value { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 5vw, 40px); line-height: 1; font-variant-numeric: tabular-nums; }
+  .combo { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--brass); letter-spacing: 0.06em; min-height: 18px; }
+  .gauge { display: flex; flex-direction: column; gap: 6px; align-items: stretch; padding-top: 4px; }
+  .gauge-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .gauge-row .psi { font-family: var(--font-display); font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; border-radius: 4px; background: var(--soot-raised); border: 1px solid var(--brass-dim); overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 20%; background: var(--brass); transition: background-color 0.2s; }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; overflow-y: auto;
+    padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: rgba(8, 11, 16, 0.72);
+    backdrop-filter: blur(3px);
+  }
+  .card {
+    width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 16px;
+    background: var(--soot-raised); border: 1px solid var(--brass-dim); border-radius: 6px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+  }
+  .card h1 { margin: 0; font-family: var(--font-display); font-weight: 900; font-size: clamp(44px, 12vw, 64px); line-height: 0.9; letter-spacing: 0.02em; text-transform: uppercase; color: var(--brass); text-wrap: balance; }
+  .card h1.bad { color: var(--danger); }
+  .card p { margin: 0; line-height: 1.5; color: var(--ink); }
+  .card .lede { color: var(--ink-dim); }
+  .patterns { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+  .patterns dt { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.06em; color: var(--brass); white-space: nowrap; }
+  .patterns dd { margin: 0; color: var(--ink-dim); min-width: 0; }
+  .patterns dt.warn { color: var(--danger); }
+  .results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .results div { display: flex; flex-direction: column; gap: 2px; }
+  .results b { font-family: var(--font-display); font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  button.go {
+    font: inherit; font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--soot); background: var(--brass); border: 0; border-radius: 4px; padding: 14px 18px; cursor: pointer;
+  }
+  button.go:hover { filter: brightness(1.08); }
+  button.go:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  [hidden] { display: none !important; }
+</style>
+
+<canvas id="game" aria-label="Ring Weaver play field"></canvas>
+
+<div class="hud" aria-live="polite">
+  <div class="stat">
+    <span class="label">Score</span>
+    <span class="value" id="score">0</span>
+    <span class="combo" id="combo"></span>
+  </div>
+  <div class="gauge">
+    <div class="gauge-row"><span class="label">Boiler pressure</span><span class="psi" id="psi">20</span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+  <div class="stat right">
+    <span class="label">Best</span>
+    <span class="value" id="best">0</span>
+  </div>
+</div>
+
+<div class="overlay" id="title">
+  <div class="card">
+    <h1>Ring Weaver</h1>
+    <p class="lede">The machine is puffing smoke rings and the pressure is climbing. Hold and drag to draw one unbroken strand through the rings. Lift to tie it off. Every finished pattern vents pressure.</p>
+    <dl class="patterns">
+      <dt>Chain</dt><dd>Thread 2 or more rings in one strand. Points grow with the square of the count.</dd>
+      <dt>Harmony ×2</dt><dd>Every ring in the chain is the same colour (3+ rings).</dd>
+      <dt>Weave ×1.5</dt><dd>Turn left, right, left… at each ring (4+ rings).</dd>
+      <dt>Orbit ×1.5</dt><dd>Turn the same way at every ring (4+ rings).</dd>
+      <dt>Loop ×1.5</dt><dd>End the strand back where it started.</dd>
+      <dt>Double ×1.5</dt><dd>Pass through the same ring twice.</dd>
+      <dt>Knot</dt><dd>+25% for each time the strand crosses itself, up to 4.</dd>
+      <dt class="warn">Ember rings</dt><dd>Dark red rings snap the strand and spike the pressure.</dd>
+    </dl>
+    <p class="lede">Rings that drift off the top unthreaded add pressure. Reach 100 and the boiler blows.</p>
+    <button class="go" id="start" type="button">Fire up the machine</button>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="card">
+    <h1 class="bad">Overload</h1>
+    <div class="results">
+      <div><span class="label">Score</span><b id="r-score">0</b></div>
+      <div><span class="label">Best</span><b id="r-best">0</b></div>
+      <div><span class="label">Longest chain</span><b id="r-chain">0</b></div>
+      <div><span class="label">Patterns woven</span><b id="r-pat">0</b></div>
+    </div>
+    <p class="lede" id="r-tip"></p>
+    <button class="go" id="restart" type="button">Relight the boiler</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Tuning ----------
+  const T = {
+    startPressure: 20,
+    passivePressure: 0.35,      // per second at t=0
+    passiveRamp: 0.008,         // added per second of play
+    passiveMax: 2.0,
+    escapePenalty: 3,
+    snapPenalty: 14,
+    spawnStart: 1.5,            // seconds between rings
+    spawnMin: 0.42,
+    spawnRamp: 0.011,
+    emberStart: 25,             // seconds before ember rings appear
+    emberMax: 0.18,
+    holeFrac: 0.8,              // fraction of ring radius that counts as the hole
+    inkScale: 2.4,              // strand length budget, in screen heights
+  };
+
+  const HUES = [172, 40, 290];
+  const cv = document.getElementById("game");
+  const ctx = cv.getContext("2d");
+  const $ = (id) => document.getElementById(id);
+  const ui = {
+    score: $("score"), best: $("best"), psi: $("psi"), bar: $("bar"), combo: $("combo"),
+    title: $("title"), over: $("over"),
+  };
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let W = 0, H = 0, DPR = 1, scale = 1;
+  let machineH = 100, machineTop = 0, nozzles = [];
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    scale = clamp(Math.min(W, H) / 800, 0.72, 1.25);
+    machineH = clamp(H * 0.14, 78, 128);
+    machineTop = H - machineH;
+    nozzles = W < 520 ? [0.27, 0.73] : [0.2, 0.5, 0.8];
+    nozzles = nozzles.map((f) => W * f);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  // ---------- Geometry ----------
+  function distSeg(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0;
+    t = clamp(t, 0, 1);
+    return Math.hypot(ax + dx * t - px, ay + dy * t - py);
+  }
+  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  function segHit(a, b, c, d) {
+    const d1 = orient(c, d, a), d2 = orient(c, d, b), d3 = orient(a, b, c), d4 = orient(a, b, d);
+    if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0))) {
+      const t = d3 / (d3 - d4);
+      return { x: c.x + (d.x - c.x) * t, y: c.y + (d.y - c.y) * t };
+    }
+    return null;
+  }
+
+  // ---------- State ----------
+  let state = "title"; // title | play | overload | over
+  let G = null;
+  let stroke = null;
+  let best = 0;
+  try { best = Number(localStorage.getItem("ringweaver.best")) || 0; } catch (e) {}
+  ui.best.textContent = best;
+
+  function newGame() {
+    G = {
+      t: 0, score: 0, pressure: T.startPressure, combo: 0, patterns: 0, longest: 0,
+      rings: [], parts: [], texts: [], strands: [],
+      spawnT: 0.2, shake: 0, vent: 0, overT: 0, hintT: 7,
+    };
+    stroke = null;
+  }
+  newGame();
+
+  // ---------- Rings ----------
+  function spawnRing() {
+    const t = G.t;
+    const nx = nozzles[(Math.random() * nozzles.length) | 0];
+    const speed = 1 + Math.min(1, t / 150);
+    const emberChance = t < T.emberStart ? 0 : Math.min(T.emberMax, (t - T.emberStart) * 0.003);
+    const ember = Math.random() < emberChance;
+    G.rings.push({
+      x: nx, y: machineTop - 34 * scale,
+      vx: rand(-28, 28) * scale, vy: -rand(42, 70) * speed * scale,
+      r: 8 * scale, tr: rand(26, 40) * scale,
+      hue: ember ? 8 : HUES[(Math.random() * HUES.length) | 0],
+      ember, age: 0, phase: rand(0, Math.PI * 2), tilt: rand(-0.4, 0.4),
+      inside: false, passes: 0, dying: 0, pulse: 0,
+    });
+    // a little puff from the chimney
+    for (let i = 0; i < 6; i++) addPart(nx + rand(-8, 8), machineTop - 30 * scale, rand(-20, 20), rand(-60, -20), 0.8, rand(4, 9), 30, 8, 60, false);
+  }
+
+  function updateRings(dt) {
+    for (let i = G.rings.length - 1; i >= 0; i--) {
+      const r = G.rings[i];
+      r.age += dt;
+      r.pulse = Math.max(0, r.pulse - dt * 3);
+      r.r += (r.tr - r.r) * Math.min(1, dt * 1.6);
+      r.x += (r.vx + Math.sin(r.age * 1.2 + r.phase) * 14 * scale) * dt;
+      r.y += r.vy * dt;
+      if (r.x < r.r) r.vx = Math.abs(r.vx);
+      if (r.x > W - r.r) r.vx = -Math.abs(r.vx);
+      if (r.dying) {
+        r.dying += dt;
+        r.r += dt * 60 * scale;
+        if (r.dying > 0.5) G.rings.splice(i, 1);
+        continue;
+      }
+      if (r.y < -r.r * 1.2) {
+        G.rings.splice(i, 1);
+        if (!r.ember && r.passes === 0 && state === "play") {
+          G.pressure += T.escapePenalty;
+          addText(clamp(r.x, 60, W - 60), 92, ["ESCAPED", "+" + T.escapePenalty + " psi"], "#ff8a6b", 0.9);
+        }
+      }
+    }
+  }
+
+  function dissolve(r) {
+    if (r.dying) return;
+    r.dying = 0.001;
+    const n = reduceMotion ? 8 : 22;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const s = rand(60, 160) * scale;
+      addPart(r.x + Math.cos(a) * r.r, r.y + Math.sin(a) * r.r, Math.cos(a) * s, Math.sin(a) * s, rand(0.5, 0.9), rand(2, 4), r.hue, 80, 70, true);
+    }
+  }
+
+  // ---------- Particles and floating text ----------
+  function addPart(x, y, vx, vy, life, size, hue, sat, light, glow) {
+    if (G.parts.length > 900) return;
+    G.parts.push({ x, y, vx, vy, life, max: life, size, hue, sat, light, glow });
+  }
+  function addText(x, y, lines, color, life = 1.4) {
+    G.texts.push({ x, y, lines, color, life, max: life });
+  }
+
+  // ---------- Stroke (the strand) ----------
+  function inkMax() { return Math.max(W, H) * T.inkScale; }
+
+  function startStroke(x, y) {
+    stroke = { pts: [{ x, y }], len: 0, passes: [], crossings: [], };
+    for (const r of G.rings) {
+      r.passes = 0;
+      r.inside = Math.hypot(x - r.x, y - r.y) < r.r * T.holeFrac;
+      if (r.inside && !r.dying) {
+        if (r.ember) { snap(r, x, y); return; }
+        registerPass(r);
+      }
+    }
+    G.hintT = Math.min(G.hintT, 0);
+  }
+
+  function registerPass(r) {
+    r.passes++;
+    r.pulse = 1;
+    stroke.passes.push({ ring: r, hue: r.hue, x: r.x, y: r.y });
+    for (let i = 0; i < 6; i++) addPart(r.x, r.y, rand(-80, 80), rand(-80, 80), 0.4, 2, r.hue, 90, 80, true);
+  }
+
+  function addPoint(x, y) {
+    if (!stroke) return;
+    const pts = stroke.pts;
+    const last = pts[pts.length - 1];
+    const d = Math.hypot(x - last.x, y - last.y);
+    if (d < 4) return;
+    const p = { x, y };
+
+    // self crossings (skip the most recent segments, they always touch)
+    for (let i = 0; i < pts.length - 3; i++) {
+      const hit = segHit(last, p, pts[i], pts[i + 1]);
+      if (hit) {
+        stroke.crossings.push(hit);
+        for (let k = 0; k < 8; k++) addPart(hit.x, hit.y, rand(-90, 90), rand(-90, 90), 0.35, 2, 48, 100, 75, true);
+      }
+    }
+
+    pts.push(p);
+    stroke.len += d;
+
+    for (const r of G.rings) {
+      if (r.dying) continue;
+      const hole = r.r * T.holeFrac;
+      if (!r.inside && distSeg(r.x, r.y, last.x, last.y, x, y) < hole) {
+        r.inside = true;
+        if (r.ember) { snap(r, x, y); return; }
+        registerPass(r);
+      } else if (r.inside && Math.hypot(x - r.x, y - r.y) > r.r * 1.05) {
+        r.inside = false;
+      }
+    }
+
+    if (stroke.len >= inkMax()) endStroke(true);
+  }
+
+  function snap(r, x, y) {
+    G.pressure += T.snapPenalty;
+    G.combo = 0;
+    G.shake = 0.45;
+    addText(x, y - 20, ["SNAPPED", "+" + T.snapPenalty + " psi"], "#ff5b3d", 1.4);
+    for (let i = 0; i < 30; i++) addPart(x, y, rand(-220, 220), rand(-220, 220), rand(0.4, 0.9), rand(2, 4), rand(5, 30), 100, 60, true);
+    dissolve(r);
+    if (stroke) G.strands.push({ pts: stroke.pts, life: 1, broken: true });
+    stroke = null;
+    for (const ring of G.rings) { ring.passes = 0; ring.inside = false; }
+  }
+
+  function turnSign(a, b, c) {
+    const x1 = b.x - a.x, y1 = b.y - a.y, x2 = c.x - b.x, y2 = c.y - b.y;
+    const l = Math.hypot(x1, y1) * Math.hypot(x2, y2);
+    if (l < 1) return 0;
+    const s = (x1 * y2 - y1 * x2) / l;
+    return Math.abs(s) < 0.12 ? 0 : Math.sign(s);
+  }
+
+  function endStroke(outOfInk) {
+    if (!stroke) return;
+    const s = stroke;
+    stroke = null;
+    const P = s.passes;
+    const n = P.length;
+    const end = s.pts[s.pts.length - 1];
+    G.strands.push({ pts: s.pts, life: 1, broken: false, good: n >= 2 });
+    for (const r of G.rings) r.inside = false;
+
+    if (outOfInk) addText(end.x, end.y - 46, ["OUT OF STRAND"], "#a39b86", 0.9);
+    if (n === 0) return;
+
+    if (n === 1) {
+      G.score += 5;
+      G.pressure -= 2;
+      G.combo = 0;
+      dissolve(P[0].ring);
+      addText(end.x, end.y - 20, ["THREAD", "+5"], "#efe7d4", 1.0);
+      return;
+    }
+
+    const names = [];
+    let mult = 1;
+    const uniq = new Set(P.map((p) => p.ring));
+
+    if (n >= 3 && P.every((p) => p.hue === P[0].hue)) { names.push("HARMONY"); mult *= 2; }
+
+    if (n >= 4) {
+      const signs = [];
+      for (let i = 1; i < n - 1; i++) signs.push(turnSign(P[i - 1], P[i], P[i + 1]));
+      if (signs.every((v) => v !== 0)) {
+        if (signs.every((v, i) => i === 0 || v !== signs[i - 1])) { names.push("WEAVE"); mult *= 1.5; }
+        else if (signs.every((v) => v === signs[0])) { names.push("ORBIT"); mult *= 1.5; }
+      }
+    }
+
+    const start = s.pts[0];
+    if (n >= 3 && s.len > 250 * scale && Math.hypot(end.x - start.x, end.y - start.y) < 48 * scale) { names.push("LOOP"); mult *= 1.5; }
+
+    if (uniq.size < n) { names.push("DOUBLE"); mult *= 1.5; }
+
+    const k = Math.min(4, s.crossings.length);
+    if (k > 0) { names.push(k > 1 ? "KNOT ×" + k : "KNOT"); mult *= 1 + 0.25 * k; }
+
+    G.patterns += names.length;
+    G.longest = Math.max(G.longest, n);
+    const comboMult = 1 + 0.1 * Math.min(G.combo, 10);
+    const points = Math.round(n * n * 5 * mult * comboMult);
+    const release = Math.round(Math.min(55, (5 + n * 4) * mult));
+    G.combo++;
+    G.score += points;
+    G.pressure -= release;
+    G.vent = Math.min(2, 0.6 + release / 30);
+    uniq.forEach(dissolve);
+
+    const head = names.length ? names.join(" · ") : "CHAIN " + n;
+    addText(clamp(end.x, 80, W - 80), clamp(end.y - 24, 110, H), [head, "+" + points, "−" + release + " psi"], names.length ? "#f6d27a" : "#efe7d4", 1.8);
+  }
+
+  // ---------- Input ----------
+  let activePointer = null;
+  cv.addEventListener("pointerdown", (e) => {
+    if (state !== "play" || activePointer !== null) return;
+    activePointer = e.pointerId;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    startStroke(e.clientX, e.clientY);
+    e.preventDefault();
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== activePointer || !stroke) return;
+    const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of (list.length ? list : [e])) addPoint(ev.clientX, ev.clientY);
+  });
+  const release = (e) => {
+    if (e.pointerId !== activePointer) return;
+    activePointer = null;
+    if (state === "play") endStroke(false);
+  };
+  cv.addEventListener("pointerup", release);
+  cv.addEventListener("pointercancel", release);
+  document.addEventListener("visibilitychange", () => { if (document.hidden && stroke) endStroke(false); });
+
+  function begin() {
+    newGame();
+    state = "play";
+    ui.title.hidden = true;
+    ui.over.hidden = true;
+  }
+  $("start").addEventListener("click", begin);
+  $("restart").addEventListener("click", begin);
+
+  // ---------- Update ----------
+  function update(dt) {
+    if (state === "play") {
+      G.t += dt;
+      G.hintT -= dt;
+      G.spawnT -= dt;
+      if (G.spawnT <= 0) {
+        spawnRing();
+        G.spawnT = Math.max(T.spawnMin, T.spawnStart - G.t * T.spawnRamp) * rand(0.75, 1.25);
+      }
+      G.pressure += Math.min(T.passiveMax, T.passivePressure + G.t * T.passiveRamp) * dt;
+      G.pressure = Math.max(0, G.pressure);
+      if (G.pressure >= 100) overload();
+    } else if (state === "overload") {
+      G.overT += dt;
+      if (G.overT > 1.5) showGameOver();
+    } else if (state === "title") {
+      // ambient rings behind the title card
+      G.spawnT -= dt;
+      if (G.spawnT <= 0) { spawnRing(); G.spawnT = 1.1; }
+    }
+    updateRings(dt);
+    G.shake = Math.max(0, G.shake - dt);
+
+    if (G.vent > 0) {
+      G.vent -= dt;
+      const vx = [W * 0.08, W * 0.92];
+      for (const x of vx) for (let i = 0; i < 2; i++) addPart(x, machineTop + 10, (x < W / 2 ? -1 : 1) * rand(40, 140), rand(-120, -40), rand(0.6, 1.1), rand(6, 14), 210, 10, 80, false);
+    }
+
+    for (let i = G.parts.length - 1; i >= 0; i--) {
+      const p = G.parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { G.parts.splice(i, 1); continue; }
+      p.vx *= Math.pow(0.12, dt); p.vy *= Math.pow(0.12, dt);
+      if (!p.glow) { p.vy -= 20 * dt; p.size += dt * 10; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+    for (let i = G.texts.length - 1; i >= 0; i--) {
+      const t = G.texts[i];
+      t.life -= dt; t.y -= 26 * dt;
+      if (t.life <= 0) G.texts.splice(i, 1);
+    }
+    for (let i = G.strands.length - 1; i >= 0; i--) {
+      G.strands[i].life -= dt * 1.5;
+      if (G.strands[i].life <= 0) G.strands.splice(i, 1);
+    }
+  }
+
+  function overload() {
+    state = "overload";
+    G.pressure = 100;
+    G.overT = 0;
+    G.shake = 1.2;
+    if (stroke) { G.strands.push({ pts: stroke.pts, life: 1, broken: true }); stroke = null; }
+    activePointer = null;
+    for (let i = 0; i < 160; i++) {
+      const a = rand(Math.PI, Math.PI * 2);
+      const s = rand(100, 520) * scale;
+      addPart(W / 2 + rand(-W * 0.3, W * 0.3), machineTop + 20, Math.cos(a) * s, Math.sin(a) * s, rand(0.6, 1.6), rand(2, 6), rand(5, 45), 100, 60, true);
+    }
+    for (let i = 0; i < 40; i++) addPart(W / 2 + rand(-W * 0.4, W * 0.4), machineTop, rand(-60, 60), rand(-200, -60), rand(1, 2), rand(12, 24), 20, 10, 40, false);
+    G.rings.forEach(dissolve);
+  }
+
+  function showGameOver() {
+    state = "over";
+    if (G.score > best) { best = G.score; try { localStorage.setItem("ringweaver.best", String(best)); } catch (e) {} }
+    ui.best.textContent = best;
+    $("r-score").textContent = G.score;
+    $("r-best").textContent = best;
+    $("r-chain").textContent = G.longest;
+    $("r-pat").textContent = G.patterns;
+    const tips = [
+      "Long chains score with the square of their length. Six rings is worth four times three.",
+      "Close a strand where you started it to add a Loop.",
+      "Same-colour chains double everything, including the pressure you vent.",
+      "Zig-zag between rings for a Weave, or circle round for an Orbit.",
+      "Cross your own strand to tie Knots. Each one adds 25%.",
+    ];
+    $("r-tip").textContent = tips[(Math.random() * tips.length) | 0];
+    ui.over.hidden = false;
+    $("restart").focus();
+  }
+
+  // ---------- Render ----------
+  function drawBackground() {
+    const heat = clamp((G.pressure - 50) / 50, 0, 1);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#090c12");
+    g.addColorStop(1, "#121822");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    const rg = ctx.createRadialGradient(W / 2, machineTop, 10, W / 2, machineTop, Math.max(W, H) * 0.8);
+    rg.addColorStop(0, `hsla(${lerp(38, 8, heat)}, 80%, 50%, ${0.10 + heat * 0.16})`);
+    rg.addColorStop(1, "hsla(30, 80%, 50%, 0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawRing(r) {
+    const fadeIn = clamp(r.age / 0.5, 0, 1);
+    const a = fadeIn * (r.dying ? clamp(1 - r.dying / 0.5, 0, 1) : 1);
+    if (a <= 0) return;
+    const lit = !!stroke && r.passes > 0;
+    ctx.save();
+    ctx.translate(r.x, r.y);
+    ctx.rotate(r.tilt * 0.3 + Math.sin(r.age * 0.7 + r.phase) * 0.08);
+    ctx.scale(1, 0.88 + 0.07 * Math.sin(r.age * 1.7 + r.phase));
+
+    const sat = r.ember ? 90 : 65;
+    const light = r.ember ? 38 : 66;
+    // soft smoke body
+    const layers = [[0.6, 0.07], [0.38, 0.13], [0.18, 0.32]];
+    for (const [w, al] of layers) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r.r, 0, Math.PI * 2);
+      ctx.lineWidth = r.r * w;
+      ctx.strokeStyle = `hsla(${r.hue}, ${sat}%, ${light}%, ${al * a})`;
+      ctx.stroke();
+    }
+    // rolling puffs along the rim
+    for (let j = 0; j < 8; j++) {
+      const ang = (j / 8) * Math.PI * 2 + r.age * (r.ember ? 1.4 : 0.5);
+      ctx.beginPath();
+      ctx.arc(Math.cos(ang) * r.r, Math.sin(ang) * r.r, r.r * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${r.hue}, ${sat}%, ${light + 6}%, ${0.07 * a})`;
+      ctx.fill();
+    }
+    // core line
+    ctx.beginPath();
+    ctx.arc(0, 0, r.r, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(1.5, r.r * 0.06);
+    if (r.ember) {
+      ctx.setLineDash([4, 5]);
+      ctx.lineDashOffset = -r.age * 30;
+      ctx.strokeStyle = `hsla(18, 100%, ${55 + Math.sin(r.age * 20) * 10}%, ${0.9 * a})`;
+    } else {
+      ctx.strokeStyle = `hsla(${r.hue}, 80%, ${lit ? 92 : 78}%, ${(lit ? 1 : 0.6) * a})`;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (lit || r.pulse > 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r.r * (1 + r.pulse * 0.25), 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = `hsla(${r.hue}, 100%, 85%, ${(lit ? 0.55 : 0) + r.pulse * 0.4})`;
+      ctx.stroke();
+      if (r.passes > 1) {
+        ctx.fillStyle = `hsla(${r.hue}, 100%, 90%, 0.9)`;
+        ctx.font = `700 ${Math.round(14 * scale + 4)}px "Big Shoulders Display", sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("×" + r.passes, 0, 0);
+      }
+    }
+    if (r.ember) {
+      for (let j = 0; j < 3; j++) {
+        const ang = r.age * 3 + (j * Math.PI * 2) / 3;
+        ctx.beginPath();
+        ctx.arc(Math.cos(ang) * r.r, Math.sin(ang) * r.r, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 190, 90, ${0.9 * a})`;
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function tracePath(pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    if (pts.length < 3) { for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y); return; }
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+    }
+    const l = pts[pts.length - 1];
+    ctx.lineTo(l.x, l.y);
+  }
+
+  function drawStrand(pts, color, alpha, width) {
+    if (pts.length < 2) return;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    tracePath(pts);
+    ctx.strokeStyle = color.replace("A", String(0.16 * alpha));
+    ctx.lineWidth = width * 4;
+    ctx.stroke();
+    ctx.strokeStyle = color.replace("A", String(0.95 * alpha));
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+
+  function roundRect(x, y, w, h, rad) {
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rad);
+    ctx.arcTo(x + w, y + h, x, y + h, rad);
+    ctx.arcTo(x, y + h, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+  }
+
+  function drawMachine() {
+    const p = clamp(G.pressure, 0, 100);
+    const heat = clamp((p - 65) / 35, 0, 1);
+    ctx.save();
+    const jitter = (heat * 2.2 + G.shake * 8) * (reduceMotion ? 0.3 : 1);
+    ctx.translate(rand(-jitter, jitter), rand(-jitter, jitter) * 0.5);
+
+    const x0 = W * 0.05, x1 = W * 0.95, top = machineTop;
+    // pipes to the side vents
+    ctx.strokeStyle = "#5d4a26"; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(x0, top + 18); ctx.lineTo(W * 0.02, top + 18); ctx.lineTo(W * 0.02, top + 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, top + 18); ctx.lineTo(W * 0.98, top + 18); ctx.lineTo(W * 0.98, top + 4); ctx.stroke();
+
+    // chimneys
+    for (const nx of nozzles) {
+      const cw = 36 * scale, ch = 34 * scale;
+      const g = ctx.createLinearGradient(nx - cw / 2, 0, nx + cw / 2, 0);
+      g.addColorStop(0, "#2b3240"); g.addColorStop(0.5, "#46505f"); g.addColorStop(1, "#22283300");
+      ctx.fillStyle = "#2a313d";
+      ctx.fillRect(nx - cw / 2, top - ch, cw, ch + 4);
+      ctx.fillStyle = g; ctx.fillRect(nx - cw / 2, top - ch, cw, ch + 4);
+      ctx.fillStyle = "#b8924a";
+      ctx.fillRect(nx - cw / 2 - 4, top - ch - 6, cw + 8, 7);
+      ctx.fillRect(nx - cw / 2 - 2, top - ch * 0.45, cw + 4, 4);
+      ctx.fillStyle = `hsla(${lerp(35, 8, heat)}, 100%, 60%, ${0.35 + heat * 0.5})`;
+      ctx.fillRect(nx - cw / 2 + 4, top - ch - 6, cw - 8, 3);
+    }
+
+    // body
+    const bg = ctx.createLinearGradient(0, top, 0, H);
+    bg.addColorStop(0, "#232a36"); bg.addColorStop(1, "#0f131a");
+    roundRect(x0, top, x1 - x0, machineH + 20, 10);
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = "#7a6232"; ctx.lineWidth = 2; ctx.stroke();
+    if (heat > 0) {
+      ctx.fillStyle = `rgba(255, 70, 40, ${heat * (0.12 + 0.1 * Math.sin(G.t * 12))})`;
+      ctx.fill();
+    }
+    // rivets
+    ctx.fillStyle = "#9c7d40";
+    for (let x = x0 + 14; x < x1 - 8; x += 26) { ctx.beginPath(); ctx.arc(x, top + 8, 2, 0, Math.PI * 2); ctx.fill(); }
+
+    // pressure dial
+    const cx = W / 2, cy = top + machineH * 0.56, R = Math.min(machineH * 0.4, 50);
+    ctx.beginPath(); ctx.arc(cx, cy, R + 5, 0, Math.PI * 2); ctx.fillStyle = "#b8924a"; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = "#e9dfc6"; ctx.fill();
+    const a0 = Math.PI * 0.8, a1 = Math.PI * 2.2;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, lerp(a0, a1, 0.75), a1); ctx.strokeStyle = "#d8452c"; ctx.lineWidth = R * 0.14; ctx.stroke();
+    ctx.strokeStyle = "#2a2a2a"; ctx.lineWidth = 1.5;
+    for (let i = 0; i <= 10; i++) {
+      const a = lerp(a0, a1, i / 10), r1 = R * (i % 5 === 0 ? 0.62 : 0.72), r2 = R * 0.9;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); ctx.stroke();
+    }
+    ctx.fillStyle = "#3a3428";
+    ctx.font = `700 ${Math.round(R * 0.26)}px "Big Shoulders Display", sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("PSI", cx, cy + R * 0.45);
+    const wob = heat > 0 ? Math.sin(G.t * 40) * 0.02 * heat : 0;
+    const na = lerp(a0, a1, p / 100) + wob;
+    ctx.beginPath(); ctx.moveTo(cx - Math.cos(na) * R * 0.15, cy - Math.sin(na) * R * 0.15); ctx.lineTo(cx + Math.cos(na) * R * 0.85, cy + Math.sin(na) * R * 0.85);
+    ctx.strokeStyle = "#b3261e"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.09, 0, Math.PI * 2); ctx.fillStyle = "#222"; ctx.fill();
+
+    // nameplate
+    if (W > 520) {
+      ctx.fillStyle = "#b8924a";
+      ctx.font = `700 ${Math.round(14 * scale + 3)}px "Big Shoulders Display", sans-serif`;
+      ctx.textAlign = "left";
+      ctx.fillText("RING ENGINE No. 7", x0 + 20, top + machineH * 0.55);
+      ctx.textAlign = "right";
+      ctx.fillText(`VENTED ${G.patterns}`, x1 - 20, top + machineH * 0.55);
+    }
+    ctx.restore();
+  }
+
+  function drawInkMeter() {
+    if (!stroke) return;
+    const l = stroke.pts[stroke.pts.length - 1];
+    const left = 1 - stroke.len / inkMax();
+    ctx.beginPath();
+    ctx.arc(l.x, l.y, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+    ctx.strokeStyle = left < 0.2 ? "rgba(255, 91, 61, 0.9)" : "rgba(246, 210, 122, 0.7)";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    if (stroke.passes.length) {
+      ctx.fillStyle = "#f6d27a";
+      ctx.font = `700 16px "Big Shoulders Display", sans-serif`;
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(String(stroke.passes.length), l.x + 22, l.y - 18);
+    }
+  }
+
+  function render() {
+    drawBackground();
+    // fading strands
+    for (const s of G.strands) {
+      drawStrand(s.pts, s.broken ? "rgba(255, 91, 61, A)" : s.good ? "rgba(246, 210, 122, A)" : "rgba(239, 231, 212, A)", s.life * 0.8, 2);
+    }
+    // rings (additive feels like smoke catching light)
+    ctx.globalCompositeOperation = "lighter";
+    for (const r of G.rings) drawRing(r);
+    ctx.globalCompositeOperation = "source-over";
+
+    if (stroke) {
+      drawStrand(stroke.pts, "rgba(255, 236, 190, A)", 1, 2.6);
+      for (const c of stroke.crossings) {
+        ctx.beginPath(); ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(246, 210, 122, 0.9)"; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      drawInkMeter();
+    }
+
+    // particles
+    for (const p of G.parts) {
+      const a = p.life / p.max;
+      ctx.globalCompositeOperation = p.glow ? "lighter" : "source-over";
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${p.hue}, ${p.sat}%, ${p.light}%, ${p.glow ? a : a * 0.18})`;
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    drawMachine();
+
+    // floating text
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const t of G.texts) {
+      const a = clamp(t.life / t.max * 1.6, 0, 1);
+      ctx.globalAlpha = a;
+      t.lines.forEach((line, i) => {
+        const size = i === 0 ? 26 : 20;
+        ctx.font = `${i === 0 ? 900 : 700} ${Math.round(size * scale + 4)}px "Big Shoulders Display", sans-serif`;
+        ctx.fillStyle = i === 2 ? "#9fd8cf" : t.color;
+        ctx.fillText(line, t.x, t.y + i * (size * scale + 6));
+      });
+    }
+    ctx.globalAlpha = 1;
+
+    if (state === "play" && G.hintT > 0) {
+      ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.85;
+      ctx.fillStyle = "#efe7d4";
+      ctx.font = `600 ${Math.round(16 * scale + 4)}px "Familjen Grotesk", sans-serif`;
+      ctx.fillText("Hold and drag through the rings. Lift to tie off.", W / 2, H * 0.42);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function updateHud() {
+    ui.score.textContent = G.score;
+    const p = Math.round(clamp(G.pressure, 0, 100));
+    ui.psi.textContent = p;
+    ui.bar.style.width = p + "%";
+    ui.bar.style.backgroundColor = p >= 75 ? "#ff5b3d" : p >= 50 ? "#e8913a" : "#d4ab57";
+    ui.combo.textContent = G.combo > 1 ? `Combo ×${(1 + 0.1 * Math.min(G.combo, 10)).toFixed(1)}` : "";
+  }
+
+  // ---------- Loop ----------
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    update(dt);
+    render();
+    updateHud();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // Test hook for automated checks
+  window.__ringWeaver = { get G() { return G; }, get state() { return state; }, begin, spawnRing };
+})();
+</script>
