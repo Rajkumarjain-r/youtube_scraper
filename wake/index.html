@@ -213,11 +213,11 @@
       <li><b class="gold">Fuel</b><span>The dots around a star are fuel cells. Land on it to refuel. Grey stars are empty.</span></li>
       <li><b class="gold">Chain</b><span>Land on the same colour again and again to multiply fuel and score.</span></li>
       <li><b class="gold">Coins</b><span>Coins sit on part of each orbit. Circle longer to grab them, but every second burns fuel.</span></li>
-      <li><b class="gold">Lasso</b><span>Cross your exhaust trail around stars to take them all at once. Crossing around nothing snags you.</span></li>
-      <li><b class="bad">Holes</b><span>Black holes (sector 3+) bend your path. The preview marks them PULL! Touch the core and you lose fuel.</span></li>
+      <li><b class="gold">Lasso</b><span>Cross your exhaust trail around stars to take them all at once. Crossing your trail is otherwise harmless.</span></li>
+      <li><b class="bad">Holes</b><span>Black holes (sector 2+) bend your path. The preview marks them PULL! Touch the core and you lose fuel.</span></li>
       <li><b>Burn</b><span>Caught by a black hole or drifting? Tap to fire your engine (−4 fuel) and blast to the nearest safe star.</span></li>
       <li><b class="bad">Aliens</b><span>Slip up and their saucer swoops in and hunts you for 6 seconds. Another mistake while it hunts and the beam lunges for double. Play clean and it gives up. It also comes when your fuel runs low.</span></li>
-      <li><b>Pickups</b><span>JET autopilots you, MAG pulls in coins, 2× doubles score, SHLD blocks one mistake.</span></li>
+      <li><b>Pickups</b><span>JET autopilots you, MAG pulls in coins, 2× doubles score, SHLD blocks one mistake. The label shows +JET etc. when your shot will grab one.</span></li>
     </ul>
     <p class="lede small">The first 20 jumps are a warm-up. After that the pace rises every 20 jumps.</p>
     <button class="go" id="close-help" type="button">Got it</button>
@@ -298,7 +298,7 @@
     sectorLen: 2600,
     band: 135, sample: 5,
     coinScore: 2, ringBonus: 10, coinHit: 0.1,
-    pickupChance: 0.2, pickupRadius: 26,
+    pickupChance: 0.3, pickupRadius: 26,
     jetSpeed: 1.6, magnetRadius: 120,
     shaveDist: 14, shavePoints: 50,
     flare: 50, novaRadius: 280, lensShots: 3,
@@ -336,7 +336,7 @@
     { id: "jumps", stat: "jumps", base: [25, 40, 60, 85], text: (n) => `Make ${n} jumps in one run` },
     { id: "sector", stat: "sector", base: [2, 3, 4, 5], text: (n) => `Reach sector ${n}` },
     { id: "pickups", stat: "pickups", base: [2, 3, 5, 7], text: (n) => `Grab ${n} power-ups in one run` },
-    { id: "shaves", stat: "shaves", base: [1, 3, 5, 8], text: (n) => n === 1 ? "Get a close shave" : `Get ${n} close shaves in one run` },
+    { id: "clean", stat: "clean", base: [8, 12, 18, 25], text: (n) => `Land ${n} times in a row without a mistake` },
     { id: "rings", stat: "rings", base: [1, 3, 5, 8], text: (n) => n === 1 ? "Clear a full coin ring" : `Clear ${n} full coin rings in one run` },
     { id: "score", stat: "score", base: [1500, 3000, 6000, 10000], text: (n) => `Score ${n.toLocaleString("en-US")} in one run` },
   ];
@@ -374,7 +374,7 @@
     P.pendingNew = false;
     save();
   }
-  if (!P.missions) newMissionSet();
+  if (!P.missions || P.missions.some((m) => !MISSIONS.find((x) => x.id === m.id))) newMissionSet();
   const mdef = (m) => MISSIONS.find((x) => x.id === m.id);
 
   // ---------- Layout ----------
@@ -523,7 +523,7 @@
       lens: 0, snap: null, revived: false, preview: null, jumps: 0, speedCur: T.calmMult,
       power: { jet: 0, magnet: 0, twin: 0, shield: 0 }, hunt: 0, lunge: 0, devGap: H * 0.6, shaveCd: 0, shipX: PW / 2,
       coinsRun: 0, coinsBanked: 0, grace: 0,
-      stats: { coins: 0, chain: 1, lasso: 0, jumps: 0, sector: 1, pickups: 0, shaves: 0, rings: 0, score: 0 },
+      stats: { coins: 0, chain: 1, lasso: 0, jumps: 0, sector: 1, pickups: 0, shaves: 0, rings: 0, score: 0, clean: 0 }, clean: 0,
       c: { x: 0, y: 0, mode: "orbit", star: first, R: first.capR * 0.8, ang: Math.PI / 2, dir: -1, vx: 0, vy: 0, freeT: 0, ignore: null, acc: 0, orbitIdx: 0, drifting: false, homing: null },
     };
     const c = G.c;
@@ -538,13 +538,12 @@
     while (G.genY > G.camTop - H * 0.8) {
       G.genY -= band;
       const sec = sectorAt(G.genY);
-      const pDwarf = sec >= 2 ? Math.min(0.2, 0.09 + 0.03 * (sec - 2)) : 0;
-      const pHole = sec >= 3 ? Math.min(0.12, 0.05 + 0.02 * (sec - 3)) : 0;
-      const bias = sec >= 4 ? 0.62 : 0.3;
+      const pHole = sec >= 2 ? Math.min(0.12, 0.05 + 0.02 * (sec - 2)) : 0;
+      const bias = sec >= 3 ? 0.62 : 0.3;
       const count = Math.random() < 0.6 ? 1 : 2;
       for (let k = 0; k < count; k++) {
         const r = Math.random();
-        const type = r < pHole ? "hole" : r < pHole + pDwarf ? "dwarf" : "star";
+        const type = r < pHole ? "hole" : "star";
         const hi = Math.random() < bias ? G.genHue : (Math.random() * HUES.length) | 0;
         for (let tries = 0; tries < 14; tries++) {
           const s = newStar(0, 0, type, hi);
@@ -580,7 +579,7 @@
     if (x < 24 || x > PW - 24) return;
     if (G.stars.some((t) => Math.hypot(t.x - x, t.y - y) < t.capR * 0.85)) return;
     const r = Math.random();
-    const type = r < 0.22 ? "jet" : r < 0.5 ? "magnet" : r < 0.75 ? "twin" : "shield";
+    const type = r < 0.12 ? "jet" : r < 0.45 ? "magnet" : r < 0.75 ? "twin" : "shield";
     G.pickups.push({ x, y, type, taken: false, bob: rand(0, TAU) });
   }
 
@@ -656,6 +655,7 @@
     const lunge = !warm && G.hunt > 0;
     const c = cost * (lunge ? 2 : warm ? 0.5 : 1);
     G.fuel -= c;
+    G.clean = 0;
     G.hunt = T.huntTime;
     G.lunge = 1;
     G.shake = Math.max(G.shake, lunge ? 0.55 : 0.25);
@@ -675,6 +675,8 @@
     G.chain = same ? Math.min(T.chainMax, G.chain + 1) : 1;
     G.lastHue = s.hue;
     stat("chain", G.chain);
+    G.clean++;
+    stat("clean", G.clean);
     const r = absorb([s], 1);
     const lines = ["+" + Math.round(r.fuel) + " fuel"];
     if (G.chain > 1) lines.unshift("CHAIN ×" + G.chain);
@@ -712,11 +714,6 @@
         const hit = segHit(last, p, tr[j], tr[j + 1]);
         if (hit) { if (crossed(j, hit, p)) return; break; }
       }
-      if (G.c.mode === "free" && G.shaveCd <= 0) {
-        for (let j = 0; j < tr.length - 30; j++) {
-          if (distSeg(p, tr[j], tr[j + 1]) < T.shaveDist * S) { closeShave(p); break; }
-        }
-      }
     }
     tr.push(p);
   }
@@ -725,12 +722,7 @@
     const tr = G.trail;
     const poly = [X, ...tr.slice(j + 1), p];
     const caught = G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly));
-    if (!caught.length) {
-      if (G.power.jet > 0 || G.c.inHole || G.c.burnT > 0) return false; // looping inside a black hole's pull is the hole's fault, not a snag
-      mistake(T.snagCost, "SNAG", X);
-      for (let i = 0; i < 20; i++) addPart(X.x, X.y, rand(-150, 150), rand(-150, 150), rand(0.3, 0.7), 2, 340, 95, 65);
-      return false;
-    }
+    if (!caught.length) return false; // crossing your trail is free; only loops around stars matter
     const n = caught.length;
     stat("lasso", n);
     const r = absorb(caught, n);
@@ -760,6 +752,7 @@
     G.parts.push({ x, y, vx, vy, life, max: life, size, hue, sat, light });
   }
   function addText(x, y, lines, color, life = 1.4) {
+    x = clamp(x, 80 * S, PW - 80 * S);
     for (let k = 0; k < 4; k++) {
       const clash = G.texts.some((t) => t.max - t.life < 0.6 && Math.abs(t.x - x) < 90 && Math.abs(t.y - y) < t.lines.length * 20 * S + 6);
       if (!clash) break;
@@ -820,11 +813,13 @@
     }
     if (cross) {
       const poly = [cross, ...tr.slice(bestJ + 1), a];
-      cross = { x: cross.x, y: cross.y, n: G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly)).length };
+      const n = G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly)).length;
+      cross = n > 0 ? { x: cross.x, y: cross.y, n } : null;
     }
     const coinsLeft = target ? target.coins.filter((k) => !k.taken).length : 0;
+    const pickups = G.pickups.filter((p) => !p.taken && distSeg(p, a, end) < T.pickupRadius * S * 0.9);
     const holes = G.stars.filter((h) => h.type === "hole" && distSeg(h, a, end) < h.capR * 1.3);
-    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft, holes };
+    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft, holes, pickups };
   }
 
   // ---------- Rocket ----------
@@ -1255,9 +1250,8 @@
 
   // ---------- Update ----------
   const SECTORS = {
-    2: ["Sector 2 · Red dwarfs", "Red stars hold no fuel and drain you while you orbit."],
-    3: ["Sector 3 · Black holes", "They bend your path. Touch the core and you lose fuel."],
-    4: ["Sector 4 · Clusters", "Same-colour stars bunch together. Chain and lasso them."],
+    2: ["Sector 2 · Black holes", "They bend your path. Tap to burn out of a pull."],
+    3: ["Sector 3 · Clusters", "Same-colour stars bunch together. Chain and lasso them."],
   };
   function update(dt) {
     const c = G.c;
@@ -1428,17 +1422,20 @@
       ctx.fillText("PULL!", h.x, h.y - h.capR * 0.6);
     }
     if (P2.cross) {
-      const good = P2.cross.n > 0;
-      ctx.strokeStyle = good ? "#ffc861" : "#ff7a9a"; ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffc861"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(P2.cross.x, P2.cross.y, 7, 0, TAU); ctx.stroke();
       ctx.font = `800 ${Math.round(12 * S)}px Manrope, sans-serif`;
-      ctx.fillStyle = good ? "#ffc861" : "#ff7a9a";
-      ctx.fillText(good ? `LASSO ×${P2.cross.n}` : `SNAG −${T.snagCost}`, P2.cross.x, P2.cross.y - 10);
+      ctx.fillStyle = "#ffc861";
+      ctx.fillText(`LASSO ×${P2.cross.n}`, P2.cross.x, P2.cross.y - 10);
+    }
+    for (const pk of P2.pickups) {
+      ctx.strokeStyle = PCOL[pk.type]; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(pk.x, pk.y + Math.sin(pk.bob) * 4, 24 * S, 0, TAU); ctx.stroke();
     }
     if (P2.miss) {
       ctx.font = `800 ${Math.round(12 * S)}px Manrope, sans-serif`;
       ctx.fillStyle = "#ff7a9a";
-      ctx.fillText("MISS · drift", P2.end.x, P2.end.y - 6);
+      ctx.fillText("MISS · drift" + P2.pickups.map((pk) => " · +" + PTXT[pk.type]).join(""), P2.end.x, P2.end.y - 6);
       return;
     }
     const s = P2.target, cr = captureR(s);
@@ -1455,9 +1452,11 @@
       color = `hsl(${s.hue}, 95%, 78%)`;
     }
     if (P2.coins) label += ` · ◉${P2.coins}`;
+    for (const pk of P2.pickups) label += ` · +${PTXT[pk.type]}`;
     ctx.font = `800 ${Math.round(13 * S)}px Manrope, sans-serif`;
     const lw = ctx.measureText(label).width + 14;
-    const ly = s.y - cr - 8;
+    let ly = s.y - cr - 8;
+    if (ly - 18 * S - G.camTop < 120) ly = s.y + cr + 26 * S; // keep the label clear of the HUD
     ctx.fillStyle = "rgba(7, 9, 19, 0.78)";
     ctx.fillRect(s.x - lw / 2, ly - 18 * S, lw, 20 * S);
     ctx.fillStyle = color;
@@ -1620,14 +1619,18 @@
     }
     for (const p of G.pickups) {
       if (p.taken || p.y < G.camTop - 30 || p.y > G.camTop + H + 30) continue;
-      const y = p.y + Math.sin(p.bob) * 4, R = 15 * S;
-      const g = ctx.createRadialGradient(p.x, y, 0, p.x, y, R * 2);
-      g.addColorStop(0, `hsla(${PHUE[p.type]}, 100%, 70%, 0.45)`); g.addColorStop(1, `hsla(${PHUE[p.type]}, 100%, 60%, 0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, R * 2, 0, TAU); ctx.fill();
+      const pulse = 1 + 0.1 * Math.sin(p.bob * 2);
+      const y = p.y + Math.sin(p.bob) * 4, R = 17 * S * pulse;
+      const g = ctx.createRadialGradient(p.x, y, 0, p.x, y, R * 3.2);
+      g.addColorStop(0, `hsla(${PHUE[p.type]}, 100%, 70%, 0.6)`); g.addColorStop(1, `hsla(${PHUE[p.type]}, 100%, 60%, 0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, R * 3.2, 0, TAU); ctx.fill();
+      const beacon = (G.t * 0.7 + p.bob * 0.1) % 1; // expanding ring so it catches the eye
+      ctx.strokeStyle = `hsla(${PHUE[p.type]}, 100%, 70%, ${0.6 * (1 - beacon)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, y, R * (1 + beacon * 2.2), 0, TAU); ctx.stroke();
       ctx.fillStyle = "rgba(7, 9, 19, 0.85)"; ctx.beginPath(); ctx.arc(p.x, y, R, 0, TAU); ctx.fill();
       ctx.strokeStyle = PCOL[p.type]; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, y, R, p.bob, p.bob + TAU * 0.8); ctx.stroke();
-      ctx.fillStyle = PCOL[p.type]; ctx.font = `800 ${Math.round(10 * S)}px Manrope, sans-serif`;
+      ctx.fillStyle = PCOL[p.type]; ctx.font = `800 ${Math.round(11 * S)}px Manrope, sans-serif`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(PTXT[p.type], p.x, y + 0.5);
     }
