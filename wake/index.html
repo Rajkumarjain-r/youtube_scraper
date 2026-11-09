@@ -1,0 +1,625 @@
+<title>Wake</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=Manrope:wght@400;600&display=swap">
+<style>
+  /* Layout: full-bleed canvas of deep space, a vertical play column that scrolls upward forever, a thin HUD on top, card overlays. Single dark look by choice. */
+  :root {
+    color-scheme: dark;
+    --void: #070913;
+    --panel: #10142a;
+    --line: #2b3260;
+    --ice: #bfe8ff;
+    --wake: #6fd6ff;
+    --sun: #ffc861;
+    --ink: #e9ecff;
+    --ink-dim: #9aa2c8;
+    --danger: #ff4f7a;
+    --font-display: "Syne", "Trebuchet MS", sans-serif;
+    --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--void); color: var(--ink); font-family: var(--font-body); }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
+
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 2; pointer-events: none;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .stat.mid { align-items: center; text-align: center; }
+  .stat.right { align-items: flex-end; text-align: right; }
+  .label { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
+  .value { font-family: var(--font-body); font-weight: 600; font-size: clamp(24px, 5vw, 36px); line-height: 1; font-variant-numeric: tabular-nums; }
+  .value.small { font-size: clamp(18px, 4vw, 24px); color: var(--sun); }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; overflow-y: auto;
+    padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: rgba(5, 7, 16, 0.6);
+    backdrop-filter: blur(2px);
+  }
+  .card {
+    width: 100%; max-width: 420px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  }
+  .card h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(48px, 13vw, 68px); line-height: 0.9; letter-spacing: -0.01em; color: var(--ice); text-wrap: balance; }
+  .card h1.bad { color: var(--danger); font-size: clamp(36px, 10vw, 52px); }
+  .card p { margin: 0; line-height: 1.55; }
+  .card .lede { color: var(--ink-dim); }
+  .rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .rules li { display: grid; grid-template-columns: 78px 1fr; gap: 12px; align-items: baseline; line-height: 1.45; }
+  .rules b { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wake); }
+  .rules b.gold { color: var(--sun); }
+  .rules b.bad { color: var(--danger); }
+  .rules span { color: var(--ink); min-width: 0; }
+  .results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .results div { display: flex; flex-direction: column; gap: 2px; }
+  .results b { font-family: var(--font-body); font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  button.go {
+    font: inherit; font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--void); background: var(--ice); border: 0; border-radius: 999px; padding: 14px 18px; cursor: pointer;
+  }
+  button.go:hover { background: #fff; }
+  button.go:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
+  [hidden] { display: none !important; }
+</style>
+
+<canvas id="game" aria-label="Wake play field"></canvas>
+
+<div class="hud" aria-live="polite">
+  <div class="stat"><span class="label">Score</span><span class="value" id="score">0</span></div>
+  <div class="stat mid"><span class="label">Stars</span><span class="value small" id="stars">0</span></div>
+  <div class="stat right"><span class="label">Best</span><span class="value" id="best">0</span></div>
+</div>
+
+<div class="overlay" id="title">
+  <div class="card">
+    <h1>Wake</h1>
+    <p class="lede">You are a comet climbing through endless space. Everything you fly leaves a trail, and the trail never fades.</p>
+    <ul class="rules">
+      <li><b>Tap</b><span>Break orbit and fly straight. The next star you pass close to catches you.</span></li>
+      <li><b class="bad">Trail</b><span>Crossing your own trail destroys you…</span></li>
+      <li><b class="gold">Lasso</b><span>…unless the loop you close has a star inside. Every star in the loop is yours, and the loop disappears.</span></li>
+      <li><b class="gold">Circle</b><span>Go all the way round a star to claim it and erase that lap.</span></li>
+      <li><b class="bad">Void</b><span>The dark rises from below. Don't fall behind, and don't fly off the sides.</span></li>
+    </ul>
+    <button class="go" id="start" type="button">Launch</button>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="card">
+    <h1 class="bad" id="r-why">Tangled</h1>
+    <div class="results">
+      <div><span class="label">Score</span><b id="r-score">0</b></div>
+      <div><span class="label">Best</span><b id="r-best">0</b></div>
+      <div><span class="label">Distance</span><b id="r-dist">0</b></div>
+      <div><span class="label">Biggest lasso</span><b id="r-lasso">0</b></div>
+    </div>
+    <p class="lede" id="r-tip"></p>
+    <button class="go" id="restart" type="button">Launch again</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Tuning ----------
+  const T = {
+    speed: 250,           // comet speed (scaled px/s)
+    speedRampPer: 30000,  // +100% speed per this many px climbed (capped)
+    speedMaxMult: 1.55,
+    capMin: 54, capMax: 80, // capture radius range (scaled)
+    orbitMinFrac: 0.55,   // closest allowed orbit, fraction of capture radius
+    bend: 0.06,           // how much nearby stars curve a free flight
+    freeMax: 4.2,         // seconds of free flight before you are lost
+    voidStart: 14, voidRamp: 0.22, voidMax: 60, // px/s the dark rises
+    lapPoints: 25,
+    lassoPoints: 100,     // × stars² per lasso
+    sample: 5,            // trail point spacing
+    band: 135,            // star generation band height (scaled)
+  };
+
+  const cv = document.getElementById("game");
+  const ctx = cv.getContext("2d");
+  const $ = (id) => document.getElementById(id);
+  const ui = { score: $("score"), stars: $("stars"), best: $("best"), title: $("title"), over: $("over") };
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const fmt = (n) => Math.floor(n).toLocaleString("en-US");
+  const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const TAU = Math.PI * 2;
+
+  // ---------- Layout ----------
+  let W = 0, H = 0, DPR = 1, PW = 0, colL = 0, S = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    PW = Math.min(W, 640);
+    colL = (W - PW) / 2;
+    S = clamp(PW / 420, 0.85, 1.35);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  // ---------- Background dust (parallax) ----------
+  const dust = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random(), d: rand(0.05, 0.35), s: rand(0.5, 1.6), a: rand(0.2, 0.8) }));
+
+  // ---------- Geometry ----------
+  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  function segHit(a, b, c, d) {
+    const d1 = orient(c, d, a), d2 = orient(c, d, b), d3 = orient(a, b, c), d4 = orient(a, b, d);
+    if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 !== 0 && d2 !== 0) {
+      const t = d3 / (d3 - d4);
+      return { x: c.x + (d.x - c.x) * t, y: c.y + (d.y - c.y) * t };
+    }
+    return null;
+  }
+  function inside(pt, poly) {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i], b = poly[j];
+      if (((a.y > pt.y) !== (b.y > pt.y)) && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+    }
+    return c;
+  }
+
+  // ---------- State ----------
+  let state = "title"; // title | play | dead | over
+  let G = null;
+  let best = 0;
+  try { best = Number(localStorage.getItem("wake.best")) || 0; } catch (e) {}
+  ui.best.textContent = fmt(best);
+
+  function newStar(x, y) {
+    const capR = rand(T.capMin, T.capMax) * S;
+    return { x, y, capR, core: capR * rand(0.11, 0.16), hue: [195, 210, 280, 330, 40][(Math.random() * 5) | 0], claimed: false, pulse: 0, tw: rand(0, TAU) };
+  }
+
+  function newGame() {
+    const first = newStar(PW / 2, 0);
+    first.capR = T.capMax * S * 0.9;
+    G = {
+      t: 0, score: 0, claimPts: 0, starsClaimed: 0, biggestLasso: 0,
+      stars: [first], genY: -first.capR * 1.2, trail: [], parts: [], texts: [], flashes: [],
+      camTop: -H * 0.62, startY: 0, maxClimb: 0, voidSpeed: T.voidStart, shake: 0, deadT: 0, why: "",
+      hintT: 8,
+      c: { x: 0, y: 0, mode: "orbit", star: first, R: first.capR * 0.8, ang: Math.PI / 2, dir: -1, vx: 0, vy: 0, freeT: 0, ignore: null, acc: 0, orbitIdx: 0 },
+    };
+    const c = G.c;
+    c.x = first.x + Math.cos(c.ang) * c.R; c.y = first.y + Math.sin(c.ang) * c.R;
+    G.trail.push({ x: c.x, y: c.y });
+    G.startY = c.y;
+    ensureStars();
+  }
+
+  function ensureStars() {
+    const band = T.band * S;
+    while (G.genY > G.camTop - H * 0.8) {
+      G.genY -= band;
+      const count = Math.random() < 0.55 ? 1 : 2;
+      for (let k = 0; k < count; k++) {
+        for (let tries = 0; tries < 14; tries++) {
+          const s = newStar(0, 0);
+          const m = s.capR * 1.15 + 6;
+          s.x = rand(m, PW - m);
+          s.y = G.genY + rand(0, band);
+          if (G.stars.every((o) => Math.hypot(o.x - s.x, o.y - s.y) > (o.capR + s.capR) * 0.92)) { G.stars.push(s); break; }
+        }
+      }
+    }
+    const cut = G.camTop + H + 260;
+    G.stars = G.stars.filter((s) => s.y < cut || s === G.c.star);
+  }
+
+  const speedNow = () => T.speed * S * Math.min(T.speedMaxMult, 1 + G.maxClimb / T.speedRampPer);
+
+  // ---------- Trail ----------
+  function addTrail(x, y) {
+    const tr = G.trail;
+    const last = tr[tr.length - 1];
+    if (Math.hypot(x - last.x, y - last.y) < T.sample) return;
+    const p = { x, y };
+    if (state === "play") {
+      let limit = tr.length - 3;
+      if (G.c.mode === "orbit") limit = Math.min(limit, G.c.orbitIdx - 2);
+      for (let j = 0; j < limit; j++) {
+        const hit = segHit(last, p, tr[j], tr[j + 1]);
+        if (hit) { crossed(j, hit, p); return; }
+      }
+    }
+    tr.push(p);
+  }
+
+  function crossed(j, X, p) {
+    const tr = G.trail;
+    const poly = [X, ...tr.slice(j + 1), p];
+    const caught = G.stars.filter((s) => !s.claimed && inside(s, poly));
+    if (!caught.length) { die("Tangled", X); return; }
+    const n = caught.length;
+    const pts = T.lassoPoints * n * n;
+    G.claimPts += pts;
+    G.biggestLasso = Math.max(G.biggestLasso, n);
+    caught.forEach(claim);
+    G.flashes.push({ poly, life: 1 });
+    G.shake = Math.min(0.5, 0.15 + n * 0.08);
+    let cx = 0, cy = 0;
+    caught.forEach((s) => { cx += s.x; cy += s.y; });
+    addText(cx / n, cy / n, [n > 1 ? `LASSO ×${n}` : "LASSO", "+" + fmt(pts)], "#ffc861", 1.8);
+    G.trail = tr.slice(0, j + 1).concat([X, p]);
+    if (G.c.mode === "orbit") { G.c.orbitIdx = G.trail.length - 1; G.c.acc = 0; }
+  }
+
+  function claim(s) {
+    if (s.claimed) return;
+    s.claimed = true;
+    s.capR *= 1.15;
+    s.pulse = 1;
+    G.starsClaimed++;
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU), v = rand(60, 220) * S;
+      addPart(s.x, s.y, Math.cos(a) * v, Math.sin(a) * v, rand(0.5, 1.1), rand(1.5, 3), 42, 100, 70);
+    }
+  }
+
+  // ---------- Particles / text ----------
+  function addPart(x, y, vx, vy, life, size, hue, sat, light) {
+    if (G.parts.length > 700) return;
+    G.parts.push({ x, y, vx, vy, life, max: life, size, hue, sat, light });
+  }
+  function addText(x, y, lines, color, life = 1.4) { G.texts.push({ x, y, lines, color, life, max: life }); }
+
+  // ---------- Comet ----------
+  function release() {
+    const c = G.c;
+    if (state !== "play" || c.mode !== "orbit") return;
+    const v = speedNow();
+    c.vx = c.dir * -Math.sin(c.ang) * v;
+    c.vy = c.dir * Math.cos(c.ang) * v;
+    c.mode = "free";
+    c.ignore = c.star;
+    c.star = null;
+    c.freeT = 0;
+    G.hintT = Math.min(G.hintT, 0.5);
+    for (let i = 0; i < 8; i++) addPart(c.x, c.y, -c.vx * rand(0.1, 0.4) + rand(-30, 30), -c.vy * rand(0.1, 0.4) + rand(-30, 30), 0.5, 1.6, 195, 90, 80);
+  }
+
+  function capture(s) {
+    const c = G.c;
+    const rx = c.x - s.x, ry = c.y - s.y;
+    const d = Math.hypot(rx, ry) || 1;
+    c.mode = "orbit";
+    c.star = s;
+    c.R = clamp(d, s.capR * T.orbitMinFrac, s.capR);
+    c.R = Math.max(s.core * 2.5, Math.min(c.R, s.x - 6, PW - s.x - 6)); // orbits never cross the side edges
+    c.ang = Math.atan2(ry, rx);
+    c.dir = rx * c.vy - ry * c.vx >= 0 ? 1 : -1;
+    c.x = s.x + Math.cos(c.ang) * c.R; c.y = s.y + Math.sin(c.ang) * c.R;
+    c.acc = 0;
+    addTrail(c.x, c.y);
+    c.orbitIdx = G.trail.length - 1;
+    s.pulse = Math.max(s.pulse, 0.5);
+  }
+
+  function stepComet(dt) {
+    const c = G.c;
+    const v = speedNow();
+    if (c.mode === "orbit") {
+      const s = c.star;
+      const w = (v / c.R) * c.dir;
+      c.ang += w * dt;
+      c.acc += w * dt;
+      c.x = s.x + Math.cos(c.ang) * c.R;
+      c.y = s.y + Math.sin(c.ang) * c.R;
+      addTrail(c.x, c.y);
+      if (state === "dead") return;
+      if (Math.abs(c.acc) >= TAU) {
+        c.acc -= Math.sign(c.acc) * TAU;
+        if (!s.claimed && state === "play") {
+          claim(s);
+          G.claimPts += T.lapPoints;
+          addText(s.x, s.y - s.capR - 14, ["CIRCLED", "+" + T.lapPoints], "#ffc861", 1.2);
+        }
+        G.trail.length = Math.min(G.trail.length, c.orbitIdx + 1);
+        G.trail.push({ x: c.x, y: c.y });
+      }
+    } else if (c.mode === "free") {
+      c.freeT += dt;
+      // nearby stars bend the path a little; speed stays constant
+      for (const s of G.stars) {
+        if (s === c.ignore) continue;
+        const dx = s.x - c.x, dy = s.y - c.y, d = Math.hypot(dx, dy);
+        if (d < s.capR * 1.5 && d > 1) {
+          const a = T.bend * v * v / d * (s.capR / d) * (s.capR / d);
+          c.vx += (dx / d) * a * dt; c.vy += (dy / d) * a * dt;
+        }
+      }
+      const m = Math.hypot(c.vx, c.vy) || 1;
+      c.vx = (c.vx / m) * v; c.vy = (c.vy / m) * v;
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      addTrail(c.x, c.y);
+      if (state !== "play") return;
+      if (c.ignore && Math.hypot(c.x - c.ignore.x, c.y - c.ignore.y) > c.ignore.capR * 1.05) c.ignore = null;
+      for (const s of G.stars) {
+        if (s === c.ignore) continue;
+        if (Math.hypot(c.x - s.x, c.y - s.y) < s.capR) { capture(s); break; }
+      }
+      if (c.mode === "free") {
+        if (c.x < 0 || c.x > PW) die("Lost", { x: clamp(c.x, 0, PW), y: c.y });
+        else if (c.freeT > T.freeMax) die("Drifted", c);
+      }
+    }
+    if (Math.random() < 0.7) addPart(c.x, c.y, rand(-15, 15), rand(-15, 15), rand(0.3, 0.6), rand(0.8, 1.8), 195, 90, 80);
+  }
+
+  function die(why, at) {
+    if (state !== "play") return;
+    state = "dead";
+    G.why = why;
+    G.deadT = 0;
+    G.shake = 0.7;
+    G.c.mode = "dead";
+    for (let i = 0; i < 90; i++) {
+      const a = rand(0, TAU), v = rand(40, 360) * S;
+      addPart(at.x, at.y, Math.cos(a) * v, Math.sin(a) * v, rand(0.5, 1.5), rand(1.5, 3.5), why === "Tangled" ? 340 : 195, 95, 70);
+    }
+  }
+
+  // ---------- Input ----------
+  cv.addEventListener("pointerdown", (e) => { if (state === "play") { release(); e.preventDefault(); } });
+  addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && state === "play") { release(); e.preventDefault(); } });
+
+  function begin() {
+    newGame();
+    state = "play";
+    ui.title.hidden = true; ui.over.hidden = true;
+  }
+  $("start").addEventListener("click", begin);
+  $("restart").addEventListener("click", begin);
+
+  // ---------- Update ----------
+  function update(dt) {
+    const c = G.c;
+    if (state === "play" || state === "title") {
+      G.t += dt;
+      G.hintT -= dt;
+      const steps = 3;
+      for (let i = 0; i < steps && (state === "play" || state === "title"); i++) stepComet(dt / steps);
+    }
+    if (state === "play") {
+      G.voidSpeed = Math.min(T.voidMax, T.voidStart + G.t * T.voidRamp);
+      G.camTop -= G.voidSpeed * S * dt;
+      const target = c.y - H * 0.6;
+      if (target < G.camTop) G.camTop += (target - G.camTop) * Math.min(1, dt * 2.5);
+      G.maxClimb = Math.max(G.maxClimb, G.startY - c.y);
+      G.score = Math.floor(G.maxClimb / 10) + G.claimPts;
+      if (c.y > G.camTop + H) die("Swallowed", { x: c.x, y: G.camTop + H - 10 });
+      ensureStars();
+      // the dark eats old trail
+      const cut = G.camTop + H + 40;
+      let drop = 0;
+      while (drop < G.trail.length - 2 && G.trail[drop].y > cut && G.trail[drop + 1].y > cut) drop++;
+      if (drop > 0) { G.trail.splice(0, drop); c.orbitIdx = Math.max(0, c.orbitIdx - drop); }
+    } else if (state === "dead") {
+      G.deadT += dt;
+      if (G.deadT > 1.4) showGameOver();
+    }
+
+    G.shake = Math.max(0, G.shake - dt);
+    for (const s of G.stars) s.pulse = Math.max(0, s.pulse - dt * 1.2);
+    for (let i = G.parts.length - 1; i >= 0; i--) {
+      const p = G.parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { G.parts.splice(i, 1); continue; }
+      p.vx *= Math.pow(0.2, dt); p.vy *= Math.pow(0.2, dt);
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+    for (let i = G.texts.length - 1; i >= 0; i--) {
+      const t = G.texts[i];
+      t.life -= dt; t.y -= 22 * dt;
+      if (t.life <= 0) G.texts.splice(i, 1);
+    }
+    for (let i = G.flashes.length - 1; i >= 0; i--) {
+      G.flashes[i].life -= dt * 1.4;
+      if (G.flashes[i].life <= 0) G.flashes.splice(i, 1);
+    }
+  }
+
+  function showGameOver() {
+    state = "over";
+    if (G.score > best) { best = G.score; try { localStorage.setItem("wake.best", String(best)); } catch (e) {} }
+    ui.best.textContent = fmt(best);
+    const why = { Tangled: "Tangled in your wake", Lost: "Lost off the edge", Drifted: "Drifted into the dark", Swallowed: "Swallowed by the void" };
+    $("r-why").textContent = why[G.why] || "Lost";
+    $("r-score").textContent = fmt(G.score);
+    $("r-best").textContent = fmt(best);
+    $("r-dist").textContent = fmt(G.maxClimb / 10);
+    $("r-lasso").textContent = G.biggestLasso ? "×" + G.biggestLasso : "–";
+    const tips = {
+      Tangled: "A crossing only saves you if the loop it closes has an unclaimed star inside.",
+      Lost: "Watch the dotted line. It shows where you'll fly if you tap now.",
+      Drifted: "Aim at a star's faint ring. That ring is where it catches you.",
+      Swallowed: "Circling a star is safe but slow. The dark keeps rising.",
+    };
+    $("r-tip").textContent = tips[G.why] || "";
+    ui.over.hidden = false;
+    $("restart").focus();
+  }
+
+  // ---------- Render ----------
+  function render() {
+    const c = G.c;
+    ctx.fillStyle = "#070913";
+    ctx.fillRect(0, 0, W, H);
+    // nebula wash that drifts with height
+    const ng = ctx.createRadialGradient(W * 0.3, H * 0.35 + (G.camTop * 0.02) % H, 10, W * 0.3, H * 0.35, Math.max(W, H) * 0.9);
+    ng.addColorStop(0, "rgba(64, 52, 140, 0.22)"); ng.addColorStop(1, "rgba(7, 9, 19, 0)");
+    ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+    for (const d of dust) {
+      const y = ((d.y * H - G.camTop * d.d) % H + H) % H;
+      ctx.fillStyle = `rgba(200, 215, 255, ${d.a * 0.6})`;
+      ctx.fillRect(d.x * W, y, d.s, d.s);
+    }
+
+    ctx.save();
+    const sh = G.shake * 10 * (reduceMotion ? 0.3 : 1);
+    ctx.translate(colL + rand(-sh, sh), -G.camTop + rand(-sh, sh));
+
+    // side edges
+    const eg = 26;
+    let gL = ctx.createLinearGradient(0, 0, eg, 0);
+    gL.addColorStop(0, "rgba(255, 79, 122, 0.22)"); gL.addColorStop(1, "rgba(255, 79, 122, 0)");
+    ctx.fillStyle = gL; ctx.fillRect(0, G.camTop, eg, H);
+    let gR = ctx.createLinearGradient(PW, 0, PW - eg, 0);
+    gR.addColorStop(0, "rgba(255, 79, 122, 0.22)"); gR.addColorStop(1, "rgba(255, 79, 122, 0)");
+    ctx.fillStyle = gR; ctx.fillRect(PW - eg, G.camTop, eg, H);
+
+    // lasso flashes
+    for (const f of G.flashes) {
+      ctx.beginPath();
+      f.poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.fillStyle = `rgba(255, 200, 97, ${0.28 * f.life})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 220, 150, ${f.life})`;
+      ctx.lineWidth = 3; ctx.stroke();
+    }
+
+    // stars
+    for (const s of G.stars) {
+      if (s.y < G.camTop - s.capR * 2 || s.y > G.camTop + H + s.capR * 2) continue;
+      const active = c.star === s;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.capR, 0, TAU);
+      if (s.claimed) {
+        ctx.strokeStyle = `rgba(255, 200, 97, ${0.35 + s.pulse * 0.5})`; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle = `hsla(${s.hue}, 80%, 75%, ${active ? 0.4 : 0.26})`; ctx.lineWidth = 1.2; ctx.setLineDash([3, 6]);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      const tw = 1 + 0.12 * Math.sin(G.t * 3 + s.tw) + s.pulse * 0.6;
+      const glowR = s.core * 4.5 * tw;
+      const hue = s.claimed ? 42 : s.hue;
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+      g.addColorStop(0, `hsla(${hue}, 100%, 85%, 0.9)`);
+      g.addColorStop(0.25, `hsla(${hue}, 90%, 65%, 0.35)`);
+      g.addColorStop(1, `hsla(${hue}, 90%, 60%, 0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, glowR, 0, TAU); ctx.fill();
+      ctx.fillStyle = s.claimed ? "#fff3d1" : "#f4f8ff";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.core * tw, 0, TAU); ctx.fill();
+      if (s.claimed) {
+        ctx.strokeStyle = "rgba(255, 220, 150, 0.7)"; ctx.lineWidth = 1.2;
+        for (let k = 0; k < 4; k++) {
+          const a = G.t * 0.4 + (k * Math.PI) / 2;
+          ctx.beginPath(); ctx.moveTo(s.x + Math.cos(a) * s.core * 1.6, s.y + Math.sin(a) * s.core * 1.6);
+          ctx.lineTo(s.x + Math.cos(a) * s.core * 3.2, s.y + Math.sin(a) * s.core * 3.2); ctx.stroke();
+        }
+      }
+    }
+
+    // trail
+    const tr = G.trail;
+    if (tr.length > 1) {
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(tr[0].x, tr[0].y);
+      for (let i = 1; i < tr.length; i++) ctx.lineTo(tr[i].x, tr[i].y);
+      if (c.mode !== "dead") ctx.lineTo(c.x, c.y);
+      ctx.strokeStyle = state === "dead" && G.why === "Tangled" ? "rgba(255, 79, 122, 0.25)" : "rgba(111, 214, 255, 0.16)";
+      ctx.lineWidth = 8; ctx.stroke();
+      ctx.strokeStyle = state === "dead" && G.why === "Tangled" ? "rgba(255, 120, 150, 0.95)" : "rgba(160, 228, 255, 0.9)";
+      ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    // aim guide
+    if (c.mode === "orbit" && state === "play") {
+      const tx = c.dir * -Math.sin(c.ang), ty = c.dir * Math.cos(c.ang);
+      ctx.setLineDash([2, 7]);
+      ctx.strokeStyle = "rgba(233, 236, 255, 0.45)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + tx * 150 * S, c.y + ty * 150 * S); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // particles
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of G.parts) {
+      ctx.fillStyle = `hsla(${p.hue}, ${p.sat}%, ${p.light}%, ${p.life / p.max})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
+    }
+    // comet head
+    if (c.mode !== "dead") {
+      const hg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 16 * S);
+      hg.addColorStop(0, "rgba(255, 255, 255, 1)"); hg.addColorStop(0.3, "rgba(160, 228, 255, 0.6)"); hg.addColorStop(1, "rgba(111, 214, 255, 0)");
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(c.x, c.y, 16 * S, 0, TAU); ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    // floating text
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const t of G.texts) {
+      ctx.globalAlpha = clamp((t.life / t.max) * 1.6, 0, 1);
+      t.lines.forEach((line, i) => {
+        ctx.font = i ? `600 ${Math.round(15 * S)}px Manrope, sans-serif` : `800 ${Math.round(18 * S)}px Syne, sans-serif`;
+        ctx.fillStyle = t.color;
+        ctx.fillText(line, t.x, t.y + i * 22 * S);
+      });
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // rising void
+    const vh = Math.min(H * 0.22, 170);
+    const vg = ctx.createLinearGradient(0, H - vh, 0, H);
+    vg.addColorStop(0, "rgba(40, 6, 30, 0)"); vg.addColorStop(0.6, "rgba(90, 10, 50, 0.45)"); vg.addColorStop(1, "rgba(150, 20, 70, 0.75)");
+    ctx.fillStyle = vg; ctx.fillRect(0, H - vh, W, vh);
+
+    // free-flight timer around the HUD-less comet
+    if (c.mode === "free" && state === "play" && c.freeT > T.freeMax * 0.45) {
+      const left = 1 - c.freeT / T.freeMax;
+      ctx.beginPath();
+      ctx.arc(colL + c.x, c.y - G.camTop, 20 * S, -Math.PI / 2, -Math.PI / 2 + TAU * left);
+      ctx.strokeStyle = "rgba(255, 79, 122, 0.85)"; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+
+    if (state === "play" && G.hintT > 0) {
+      ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.9;
+      ctx.fillStyle = "#e9ecff";
+      ctx.font = `600 ${Math.round(15 * S)}px Manrope, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("Tap to break orbit. Follow the dotted line.", W / 2, H * 0.3);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function updateHud() {
+    ui.score.textContent = fmt(G.score);
+    ui.stars.textContent = G.starsClaimed;
+  }
+
+  // ---------- Loop ----------
+  newGame();
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - lastT) / 1000);
+    lastT = now;
+    update(dt);
+    render();
+    updateHud();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // Test hook for automated checks
+  window.__wake = { get G() { return G; }, get state() { return state; }, begin, release, crossed, T };
+})();
+</script>
