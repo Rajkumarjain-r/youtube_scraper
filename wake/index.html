@@ -174,7 +174,9 @@
 
   // ---------- Tuning ----------
   const T = {
-    speed: 240, speedPerLevel: 0.05, speedMax: 1.6,
+    speed: 240,
+    calmJumps: 20, calmMult: 0.8,   // learning phase: first 20 landings at 80% speed (and 80% drain)
+    stepJumps: 20, stepMult: 0.06, speedMax: 1.8, // then +6% every 20 landings, capped
     capMin: 54, capMax: 80, capPerLevel: 0.035,
     orbitMinFrac: 0.55, bend: 0.06,
     lightStart: 60,
@@ -253,9 +255,10 @@
   try { best = Number(localStorage.getItem("wake.v2.best")) || 0; } catch (e) {}
 
   const sectorAt = (y) => 1 + Math.floor(Math.max(0, G.startY - y) / (T.sectorLen * S));
-  const captureR = (s) => s.capR * (1 + T.capPerLevel * (G.level - 1));
-  const speedNow = () => T.speed * S * Math.min(T.speedMax, 1 + T.speedPerLevel * (G.level - 1));
-  const drainNow = () => T.drainBase * (1 + T.drainPerLevel * (G.level - 1)) * (1 + T.drainPerSector * (G.sector - 1));
+  const captureR = (s) => s.capR * (1 + T.capPerLevel * (G.level - 1)) * (1 + 0.5 * Math.max(0, G.speedCur - 1));
+  const speedTarget = () => G.jumps < T.calmJumps ? T.calmMult : Math.min(T.speedMax, 1 + T.stepMult * Math.floor((G.jumps - T.calmJumps) / T.stepJumps));
+  const speedNow = () => T.speed * S * G.speedCur;
+  const drainNow = () => T.drainBase * Math.min(1, G.speedCur) * (1 + T.drainPerLevel * (G.level - 1)) * (1 + T.drainPerSector * (G.sector - 1));
 
   function newStar(x, y, type = "star", hueIdx = 0) {
     const capR = rand(T.capMin, T.capMax) * S;
@@ -278,7 +281,7 @@
       stars: [first], genY: -first.capR * 1.2, genHue: 0, trail: [], parts: [], texts: [], flashes: [], rings: [],
       camTop: -H * 0.58, startY: 0, maxClimb: 0, shake: 0, darkT: 0, banner: null, hintT: 9,
       boosters: { flare: T.boostersStart, lens: T.boostersStart, rewind: T.boostersStart, nova: T.boostersStart },
-      lens: 0, snap: null, revived: false, preview: null, lowWarn: 0,
+      lens: 0, snap: null, revived: false, preview: null, lowWarn: 0, jumps: 0, speedCur: T.calmMult,
       c: { x: 0, y: 0, mode: "orbit", star: first, R: first.capR * 0.8, ang: Math.PI / 2, dir: -1, vx: 0, vy: 0, freeT: 0, ignore: null, acc: 0, orbitIdx: 0, drifting: false, homing: null },
     };
     const c = G.c;
@@ -330,7 +333,7 @@
       const k = keys[(Math.random() * keys.length) | 0];
       G.boosters[k]++;
       const names = { flare: "Flare", lens: "Lens", rewind: "Rewind", nova: "Nova" };
-      banner(`Comet level ${G.level}`, `Brighter and faster, but burns hotter. +1 ${names[k]}`);
+      banner(`Comet level ${G.level}`, `Wider reach, but burns hotter. +1 ${names[k]}`);
       G.rings.push({ x: G.c.x, y: G.c.y, r: 10, life: 1, hue: 45 });
     }
   }
@@ -494,7 +497,7 @@
     if (state !== "play" || c.mode !== "orbit") return;
     G.snap = {
       c: { ...c }, light: G.light, chain: G.chain, lastHue: G.lastHue, sparkScore: G.sparkScore,
-      totalLight: G.totalLight, level: G.level, nextLevelAt: G.nextLevelAt, trail: G.trail.slice(), used: [],
+      totalLight: G.totalLight, level: G.level, nextLevelAt: G.nextLevelAt, jumps: G.jumps, trail: G.trail.slice(), used: [],
     };
     const v = speedNow();
     c.vx = c.dir * -Math.sin(c.ang) * v;
@@ -521,7 +524,16 @@
     addTrail(c.x, c.y);
     c.orbitIdx = G.trail.length - 1;
     s.pulse = Math.max(s.pulse, 0.5);
-    if (state === "play") onLand(s);
+    if (state === "play") {
+      const before = speedTarget();
+      G.jumps++;
+      const after = speedTarget();
+      if (after > before) {
+        if (before < 1) banner("Warm-up over", "The pace picks up. It rises again every " + T.stepJumps + " jumps.");
+        else banner("Faster · speed ×" + after.toFixed(2), after >= T.speedMax ? "Top speed reached." : "Next speed-up in " + T.stepJumps + " jumps.");
+      }
+      onLand(s);
+    }
   }
 
   function nearestCapturable(c) {
@@ -627,7 +639,7 @@
       if (!s) return;
       Object.assign(c, s.c);
       for (const st of s.used) st.used = false;
-      Object.assign(G, { light: s.light, chain: s.chain, lastHue: s.lastHue, sparkScore: s.sparkScore, totalLight: s.totalLight, level: s.level, nextLevelAt: s.nextLevelAt, trail: s.trail });
+      Object.assign(G, { light: s.light, chain: s.chain, lastHue: s.lastHue, sparkScore: s.sparkScore, totalLight: s.totalLight, level: s.level, nextLevelAt: s.nextLevelAt, jumps: s.jumps, trail: s.trail });
       G.snap = null;
       G.rings.push({ x: c.x, y: c.y, r: 60, life: 1, hue: 220, shrink: true });
       addText(c.x, c.y - 30, ["REWIND"], "#e9ecff", 1.0);
@@ -684,6 +696,7 @@
   };
   function update(dt) {
     const c = G.c;
+    G.speedCur += (speedTarget() - G.speedCur) * Math.min(1, dt * 0.8);
     if (state === "play" || state === "title") {
       G.t += dt;
       G.hintT -= dt;

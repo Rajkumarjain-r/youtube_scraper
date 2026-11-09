@@ -19,9 +19,14 @@ Run it: open `index.html` in any modern browser. Tap / click / Space to release;
 | Red dwarf (sector 2+) | Drains −7 Light/s while orbiting, breaks chain |
 | Black hole core (sector 3+) | −15 Light, flung away |
 
+## Pace
+- **Warm-up:** the first 20 jumps (landings) run at 80% speed and 80% Light drain so new players can learn.
+- After that the pace eases to 100%, then **+6% every 20 jumps**, capped at 1.8×. A banner announces each step.
+- Stars' catch radius grows a little with speed so fast shots still land.
+
 ## Growth and the end
 - Light drains constantly: 1.6/s, +12% per comet level, +6% per sector.
-- Absorbed Light fills XP. Each **comet level**: faster, bigger catch radius, hotter burn, +1 random booster.
+- Absorbed Light fills XP. Each **comet level**: bigger catch radius, hotter burn, +1 random booster.
 - **Sectors** every 2,600 px: 2 red dwarfs, 3 black holes, 4 colour clusters, 5+ deep space.
 - **Game over:** Light hits 0. Score = distance/10 + spark score. One **Second Wind** per run relights at 30%.
 
