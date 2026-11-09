@@ -1,28 +1,17 @@
-# Ring Weaver (prototype)
+# Ring Weaver (prototype, merge version)
 
-A machine puffs smoke rings. Hold and drag to draw one unbroken strand through them; lift to tie it off. Finished patterns vent boiler pressure and score points. Reach 100 psi and the machine overloads.
+A machine at the bottom blows numbered bubbles (2, 4, 8 … up to 1M = 2^20). They float **up** and pile against the ceiling. Aim the launcher along the bottom and tap to release the next bubble. Two touching bubbles with the same number merge into one with double the value.
 
-Run it: open `index.html` in any modern browser (mouse or touch). No build step, no dependencies.
+Run it: open `index.html` in any modern browser (mouse, touch, or ←/→ + Space). No build step.
 
 ## Rules implemented
 
-| Pattern | Condition | Effect |
-|---|---|---|
-| Chain | 2+ rings threaded in one strand | `n² × 5` points |
-| Harmony | all rings same colour, 3+ | ×2 |
-| Weave | turns alternate L/R at each ring, 4+ | ×1.5 |
-| Orbit | same turn direction at every ring, 4+ | ×1.5 |
-| Loop | strand ends where it started, 3+ | ×1.5 |
-| Double | same ring threaded twice | ×1.5 |
-| Knot | strand crosses itself | +25% per crossing (max 4) |
-| Combo | consecutive 2+ chains | +10% each (max +100%) |
-
-Pressure vented per pattern: `min(55, (5 + 4n) × multiplier)`.
-
-Mistakes / pressure sources:
-- Passive build-up that ramps over time.
-- Unthreaded ring drifts off the top: +3 psi.
-- Ember ring (dark red, dashed) touched by the strand: strand snaps, +14 psi, combo reset.
-- Strand length is capped (ink budget, ring around the cursor); running out auto-ties the strand.
+- Launched value is random: 2/4/8/16 (weights 40/30/20/10); 32 joins the pool once you've made a 256.
+- Merge score = new bubble's value. Merges within 0.7 s of each other form a chain: +25% per step.
+- Reaching 1M gives a one-time +1,000,000 bonus. 1M bubbles don't merge further.
+- Lose condition: a settled bubble (older than 1.1 s) stays below the red line for 2 s.
+- The machine's dial and the HUD bar show how far the pile has grown toward the line.
 
 All balance numbers live in the `T` object at the top of the script.
+
+The earlier "draw a strand through rings" version is in git history (commit before this one).
