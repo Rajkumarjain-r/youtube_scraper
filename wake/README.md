@@ -12,7 +12,8 @@ Run it: open `index.html` in any modern browser. Tap / click / Space to release;
 - **The alien saucer** sits as close as your fuel is low. Mistakes (drift, snag, red dwarf, black hole) cost fuel; a second mistake within 4 s makes the tractor beam lunge for double. Warm-up (first 20 jumps): half cost, no lunges.
 - **Pickups** on the paths between stars: JET (autopilot, no burn), MAG (pulls coins), 2× (double score), SHLD (blocks one mistake).
 - **Pace**: first 20 jumps at 80% speed, then +6% every 20 jumps (cap 1.8×).
-- **Game over** when fuel hits 0 ("Abducted!"). **Second Wind** costs 1 ◆ shard, once per run.
+- **Black holes** (sector 3+): gentle pull (0.45 strength, 1.8× reach), small core. A hit costs 10 fuel, throws you toward the nearest safe star and gives 1.5 s of protection, so one hit is one mistake. The preview marks holes on your path with PULL!
+- **Game over** when fuel hits 0 ("Abducted!"). **Second Wind** costs 1 ◆ shard, once per run: you restart in orbit around the nearest safe star with 40 fuel, a cleared trail, the saucer pushed back and 3 s of protection.
 
 ## Between runs (saved in the browser)
 - **Missions**: 3 at a time, mostly "in one run". Finishing a set gives +1 permanent score multiplier (cap ×30), +1 ◆ and +250 ◉. Targets get harder every 2 sets.

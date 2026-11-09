@@ -214,6 +214,7 @@
       <li><b class="gold">Chain</b><span>Land on the same colour again and again to multiply fuel and score.</span></li>
       <li><b class="gold">Coins</b><span>Coins sit on part of each orbit. Circle longer to grab them, but every second burns fuel.</span></li>
       <li><b class="gold">Lasso</b><span>Cross your exhaust trail around stars to take them all at once. Crossing around nothing snags you.</span></li>
+      <li><b class="bad">Holes</b><span>Black holes (sector 3+) bend your path. The preview marks them PULL! Touch the core and you lose fuel.</span></li>
       <li><b class="bad">Aliens</b><span>Their ship closes in as your fuel drops. Misses and snags let it gain. Two mistakes within 4 seconds and the beam lunges for double.</span></li>
       <li><b>Pickups</b><span>JET autopilots you, MAG pulls in coins, 2× doubles score, SHLD blocks one mistake.</span></li>
     </ul>
@@ -287,7 +288,7 @@
     fuelStart: 60,
     drainBase: 1.6, drainPerLevel: 0.12, drainPerSector: 0.06,
     driftDrain: 5, dwarfDrain: 7,
-    snagCost: 8, holeCost: 15, driftCost: 4, dwarfCost: 4, hungryTime: 4,
+    snagCost: 8, holeCost: 10, driftCost: 4, dwarfCost: 4, hungryTime: 4,
     cellFuel: 2.1, chainFuelStep: 0.35, chainMax: 8, cellScore: 10, lassoBonus: 1.5,
     missTime: 1.3,
     levelBase: 45, levelStep: 25,
@@ -298,7 +299,8 @@
     jetSpeed: 1.6, magnetRadius: 120,
     shaveDist: 14, shavePoints: 50,
     flare: 50, novaRadius: 280, lensShots: 3,
-    revive: 30,
+    revive: 40, reviveGrace: 3, holeGrace: 1.5,
+    holePull: 0.45, holeReach: 1.8, holeCore: 0.3,
   };
   const HUES = [200, 45, 330, 150];
   const UPG = {
@@ -516,7 +518,7 @@
       camTop: -H * 0.58, startY: 0, maxClimb: 0, shake: 0, darkT: 0, banner: null, hintT: 9,
       lens: 0, snap: null, revived: false, preview: null, jumps: 0, speedCur: T.calmMult,
       power: { jet: 0, magnet: 0, twin: 0, shield: 0 }, hungry: 0, lunge: 0, devGap: H * 0.6, shaveCd: 0, shipX: PW / 2,
-      coinsRun: 0, coinsBanked: 0,
+      coinsRun: 0, coinsBanked: 0, grace: 0,
       stats: { coins: 0, chain: 1, lasso: 0, jumps: 0, sector: 1, pickups: 0, shaves: 0, rings: 0, score: 0 },
       c: { x: 0, y: 0, mode: "orbit", star: first, R: first.capR * 0.8, ang: Math.PI / 2, dir: -1, vx: 0, vy: 0, freeT: 0, ignore: null, acc: 0, orbitIdx: 0, drifting: false, homing: null },
     };
@@ -638,7 +640,7 @@
   }
 
   function mistake(cost, label, at) {
-    if (G.power.jet > 0) return;
+    if (G.power.jet > 0 || G.grace > 0) return;
     if (G.power.shield > 0) {
       G.power.shield = 0;
       addText(at.x, at.y - 22, ["SHIELD", "blocked " + label.toLowerCase()], "#8fe3ff", 1.3);
@@ -817,7 +819,8 @@
       cross = { x: cross.x, y: cross.y, n: G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly)).length };
     }
     const coinsLeft = target ? target.coins.filter((k) => !k.taken).length : 0;
-    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft };
+    const holes = G.stars.filter((h) => h.type === "hole" && distSeg(h, a, end) < h.capR * 1.3);
+    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft, holes };
   }
 
   // ---------- Rocket ----------
@@ -871,7 +874,8 @@
     let b = null, bd = Infinity;
     for (const s of G.stars) {
       if (s.type === "hole" || (s === c.ignore && c.freeT < 0.8)) continue;
-      const d = Math.hypot(s.x - c.x, s.y - c.y) * (s.used ? 1.4 : 1) * (s.type === "dwarf" ? 1.6 : 1);
+      const nearHole = G.stars.some((h) => h.type === "hole" && Math.hypot(h.x - s.x, h.y - s.y) < h.capR * 2.4);
+      const d = Math.hypot(s.x - c.x, s.y - c.y) * (s.used ? 1.4 : 1) * (s.type === "dwarf" ? 1.6 : 1) * (nearHole ? 2 : 1);
       if (d < bd) { bd = d; b = s; }
     }
     return b;
@@ -904,15 +908,19 @@
         const dx = s.x - c.x, dy = s.y - c.y, d = Math.hypot(dx, dy);
         if (s.type === "hole") {
           s.cool = Math.max(0, s.cool - dt);
-          if (d < s.capR * 2.2 && d > 1) {
-            const a = 1.4 * v * v / d * (s.capR / d);
+          if (d < s.capR * T.holeReach && d > 1) {
+            const a = T.holePull * v * v / d * (s.capR / d);
             c.vx += (dx / d) * a * dt; c.vy += (dy / d) * a * dt;
           }
-          if (d < s.capR * 0.38 && s.cool <= 0 && state === "play") {
+          if (d < s.capR * T.holeCore && s.cool <= 0 && state === "play") {
             s.cool = 4;
             mistake(T.holeCost, "BLACK HOLE", c);
-            c.vx = (-dx / d) * v; c.vy = (-dy / d) * v;
-          } else if (!s.shaved && d < s.capR * 0.75 && d > s.capR * 0.4 && state === "play") { s.shaved = true; closeShave(c); }
+            G.grace = Math.max(G.grace, T.holeGrace); // one hit = one mistake, no chain reaction
+            const safe = nearestCapturable(c);
+            if (safe) { const sx = safe.x - c.x, sy = safe.y - c.y, sd = Math.hypot(sx, sy) || 1; c.vx = (sx / sd) * v; c.vy = (sy / sd) * v; c.homing = safe; }
+            else { c.vx = (-dx / d) * v; c.vy = (-dy / d) * v; }
+            c.freeT = 0; c.drifting = false; c.ignore = null;
+          } else if (!s.shaved && d < s.capR * 0.75 && d > s.capR * T.holeCore + 4 && state === "play") { s.shaved = true; closeShave(c); }
         } else if (d < s.capR * 1.5 && d > 1) {
           const a = T.bend * v * v / d * (s.capR / d) * (s.capR / d);
           c.vx += (dx / d) * a * dt; c.vy += (dy / d) * a * dt;
@@ -920,7 +928,7 @@
       }
       if (c.homing && !c.drifting) steer(c, c.homing.x, c.homing.y, 5, dt);
       const offscreen = c.x < -20 || c.x > PW + 20 || c.y > G.camTop + H + 40;
-      if (!c.drifting && (c.freeT > T.missTime || offscreen) && state === "play") {
+      if (!c.drifting && (c.freeT > T.missTime || offscreen) && state === "play" && G.grace <= 0) {
         c.drifting = true; c.driftT = 0;
         mistake(T.driftCost, "DRIFTING", { x: clamp(c.x, 60, PW - 60), y: c.y });
       }
@@ -996,6 +1004,31 @@
     G.fuel = 0;
     G.darkT = 0;
     G.shake = 0.5;
+  }
+
+  // Second Wind: park the rocket in a safe orbit, clear the trail, push the saucer back
+  function safeRespawn() {
+    const c = G.c;
+    let best = null, bd = Infinity;
+    for (const s of G.stars) {
+      if (s.type !== "star") continue;
+      const nearHole = G.stars.some((h) => h.type === "hole" && Math.hypot(h.x - s.x, h.y - s.y) < h.capR * 2.6);
+      const d = Math.hypot(s.x - c.x, s.y - c.y) * (s.used ? 1.6 : 1) * (nearHole ? 3 : 1) * (s.y > c.y + 80 ? 1.4 : 1);
+      if (d < bd) { bd = d; best = s; }
+    }
+    if (!best) return;
+    c.mode = "orbit"; c.star = best; c.homing = null; c.drifting = false; c.ignore = null; c.freeT = 0;
+    c.R = laneR(best);
+    c.ang = Math.atan2(c.y - best.y, c.x - best.x) || -Math.PI / 2;
+    c.dir = 1; c.acc = 0;
+    c.x = best.x + Math.cos(c.ang) * c.R; c.y = best.y + Math.sin(c.ang) * c.R;
+    G.trail = [{ x: c.x, y: c.y }];
+    c.orbitIdx = 0;
+    G.snap = null;
+    G.grace = T.reviveGrace;
+    G.lunge = 0;
+    G.devGap = 10 + (H * 0.42 + 70) * Math.pow(T.revive / 100, 0.85);
+    for (const s of G.stars) if (s.type === "hole") s.cool = 4;
   }
 
   // ---------- Boosters ----------
@@ -1177,6 +1210,7 @@
     G.revived = true;
     G.fuel = T.revive;
     G.hungry = 0;
+    safeRespawn();
     state = "play";
     show(null);
     $("tray").hidden = false;
@@ -1207,6 +1241,7 @@
       if (G.fuel <= 0) goDark();
       for (const k of ["jet", "magnet", "twin"]) G.power[k] = Math.max(0, G.power[k] - dt);
       G.hungry = Math.max(0, G.hungry - dt);
+      G.grace = Math.max(0, G.grace - dt);
       G.shaveCd = Math.max(0, G.shaveCd - dt);
       collectPowers(dt);
       if (G.power.jet > 0 && c.mode === "orbit") {
@@ -1347,6 +1382,11 @@
     else ctx.lineTo(P2.end.x, P2.end.y);
     ctx.stroke(); ctx.setLineDash([]);
     ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    for (const h of P2.holes) {
+      ctx.font = `800 ${Math.round(12 * S)}px Manrope, sans-serif`;
+      ctx.fillStyle = "#ffa45c";
+      ctx.fillText("PULL!", h.x, h.y - h.capR * 0.6);
+    }
     if (P2.cross) {
       const good = P2.cross.n > 0;
       ctx.strokeStyle = good ? "#ffc861" : "#ff7a9a"; ctx.lineWidth = 2;
@@ -1433,6 +1473,10 @@
     ctx.beginPath(); ctx.moveTo(-11, -5.5); ctx.lineTo(4, -5.5); ctx.quadraticCurveTo(14, -4.5, 17, 0); ctx.quadraticCurveTo(14, 4.5, 4, 5.5); ctx.lineTo(-11, 5.5); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "#0b1030"; ctx.strokeStyle = sk.accent; ctx.lineWidth = 1.3;
     ctx.beginPath(); ctx.arc(3, 0, 2.6, 0, TAU); ctx.fill(); ctx.stroke();
+    if (G.grace > 0 && state === "play") {
+      ctx.strokeStyle = `rgba(140, 255, 180, ${0.4 + 0.3 * Math.sin(G.t * 14)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(2, 0, 22, 0, TAU); ctx.stroke();
+    }
     if (G.power.shield > 0) {
       ctx.strokeStyle = "rgba(143, 227, 255, 0.7)"; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(2, 0, 19, 0, TAU); ctx.stroke();
