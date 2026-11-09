@@ -9,7 +9,8 @@ Run it: open `index.html` in any modern browser. Tap / click / Space to release;
 - **Fuel** drains constantly. Stars' dots are fuel cells; landing refuels. Same-colour landings build a **chain** (×2…×8) that multiplies fuel and score.
 - **Coins** sit as an arc on part of each star's orbit. Circling longer collects more but burns fuel. Clearing a whole arc pays +10 bonus coins.
 - **Lasso**: cross your exhaust trail around unused stars to take them all at once.
-- **The alien saucer** sits as close as your fuel is low. Mistakes (drift, snag, red dwarf, black hole) cost fuel; a second mistake within 4 s makes the tractor beam lunge for double. Warm-up (first 20 jumps): half cost, no lunges.
+- **The alien saucer** only shows up when you slip, like the chaser in a runner game. After any mistake (drift, snag, red dwarf, black hole) it swoops in and **hunts you for 6 s** ("ALIENS!" timer). Another mistake while it hunts makes the tractor beam lunge for double cost. Play clean and it gives up ("SHAKEN OFF"). It also appears whenever fuel is below 20%. Warm-up (first 20 jumps): half cost, no lunges.
+- **Engine burn**: when a black hole is pulling you or you're drifting, tap to burn (−4 fuel) toward the nearest safe star. If you sit in a pull for 1.8 s the rocket auto-ejects. Looping around a black hole never counts as a snag or a drift.
 - **Pickups** on the paths between stars: JET (autopilot, no burn), MAG (pulls coins), 2× (double score), SHLD (blocks one mistake).
 - **Pace**: first 20 jumps at 80% speed, then +6% every 20 jumps (cap 1.8×).
 - **Black holes** (sector 3+): gentle pull (0.45 strength, 1.8× reach), small core. A hit costs 10 fuel, throws you toward the nearest safe star and gives 1.5 s of protection, so one hit is one mistake. The preview marks holes on your path with PULL!
