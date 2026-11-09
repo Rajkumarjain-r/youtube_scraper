@@ -90,9 +90,11 @@
 <div class="overlay" id="title">
   <div class="card">
     <h1>Ring Weaver</h1>
-    <p class="lede">The machine blows numbered bubbles that float up and stick to the ceiling. Aim the launcher and tap to release the next one. Two bubbles with the same number merge into one twice as big.</p>
+    <p class="lede">The machine blows numbered bubbles that float up and stick to the ceiling. Two bubbles with the same number merge into one twice as big.</p>
+    <p>Three pipes in the ceiling each ask for one number. Get that exact bubble into the pipe to <b>ship</b> it: big points, and the space is free again. A wrong bubble sitting under a pipe blocks it.</p>
+    <p><b>Tap</b> for a gentle puff. <b>Hold</b> to charge a hard shot that shoves the pile, to knock a bubble into a pipe or clear one that's in the way.</p>
     <div class="ladder" id="ladder" aria-label="Bubble sizes from 2 to one million"></div>
-    <p class="lede">The pile grows downward. If it stays below the red line for more than two seconds, the machine chokes and the game ends. Can you reach one million?</p>
+    <p class="lede">If the pile hangs below the red line for two seconds, the machine chokes. Orders grow with your biggest bubble, all the way to one million.</p>
     <button class="go" id="start" type="button">Start the machine</button>
   </div>
 </div>
@@ -104,7 +106,7 @@
       <div><span class="label">Score</span><b id="r-score">0</b></div>
       <div><span class="label">Best</span><b id="r-best">0</b></div>
       <div><span class="label">Biggest bubble</span><b id="r-big">0</b></div>
-      <div><span class="label">Merges</span><b id="r-merges">0</b></div>
+      <div><span class="label">Shipped</span><b id="r-merges">0</b></div>
     </div>
     <p class="lede" id="r-tip"></p>
     <button class="go" id="restart" type="button">Run it again</button>
@@ -120,7 +122,12 @@
     maxLevel: 20,          // 2^20 = 1,048,576 ("1M")
     buoyancy: 1150,         // upward acceleration, px/s² (scaled)
     drag: 2.2,             // velocity damping per second
-    launchSpeed: 900,      // initial upward speed (scaled)
+    launchMin: 480,        // tap: gentle puff (scaled px/s)
+    launchMax: 1750,       // full charge: hard shot that shoves the pile
+    chargeTime: 0.65,      // seconds to full charge
+    outletFrac: 0.2,       // outlet mouth width, fraction of column
+    deliverMult: 4,        // shipping score = value × this
+    suction: 520,          // pull on matching bubbles near an outlet
     restitution: 0.15,
     cooldown: 0.38,        // seconds between launches
     settleAge: 1.1,        // bubbles younger than this don't count against the line
@@ -162,11 +169,11 @@
     machineTop = H - machineH;
     colW = Math.min(W - 24, 540);
     colL = (W - colW) / 2; colR = colL + colW;
-    ceil = 84;
+    ceil = 112;
     nozzleY = machineTop - 26;
     dangerY = nozzleY - radiusOf(4) * 2 - 20;
   }
-  function radiusOf(lvl) { return colW * (0.04 + 0.0118 * (lvl - 1)); }
+  function radiusOf(lvl) { return colW * (0.045 + 0.0085 * (lvl - 1)); }
   addEventListener("resize", () => { resize(); if (G) G.bubbles.forEach((b) => (b.tr = radiusOf(b.level))); });
 
   // ---------- State ----------
@@ -190,11 +197,65 @@
       t: 0, score: 0, merges: 0, biggest: 1, bubbles: [], parts: [], texts: [],
       cooldown: 0, dangerT: 0, depth: 0, shake: 0, chokeT: 0, chain: 0, chainT: 0,
       cur: 1, next: 1, hintT: 6, millionDone: false,
+      charge: 0, charging: false, shipped: 0, bestShipped: 0, sucking: [],
+      outlets: [1 / 6, 1 / 2, 5 / 6].map((frac, i) => ({ frac, level: [3, 4, 5][i], cool: 0, flash: 0, hot: false })),
     };
+    G.outlets.sort(() => Math.random() - 0.5).forEach((o, i) => (o.frac = [1 / 6, 1 / 2, 5 / 6][i]));
     G.cur = rollLevel(); G.next = rollLevel();
   }
   resize();
   newGame();
+
+  // ---------- Outlets (orders) ----------
+  const outletX = (o) => colL + o.frac * colW;
+  function newOrder(o) {
+    const lo = clamp(G.biggest - 2, 3, T.maxLevel - 2), hi = clamp(Math.max(G.biggest + 1, lo + 2), lo, T.maxLevel);
+    let lvl = lo;
+    for (let tries = 0; tries < 8; tries++) {
+      lvl = lo + Math.floor(Math.random() * (hi - lo + 1));
+      if (!G.outlets.some((p) => p !== o && p.level === lvl)) break;
+    }
+    o.level = lvl;
+  }
+  function deliver(b, o) {
+    b.dead = true;
+    const v = valueOf(b.level);
+    const gain = v * T.deliverMult;
+    G.score += gain;
+    G.shipped++;
+    G.bestShipped = Math.max(G.bestShipped, b.level);
+    G.sucking.push({ x: b.x, y: b.y, r: b.r, level: b.level, tx: outletX(o), t: 0 });
+    o.flash = 1; o.cool = 0.7;
+    addText(outletX(o), ceil + 60, ["SHIPPED " + label(b.level), "+" + fmt(gain)], "#f6d27a", 1.5);
+    for (let i = 0; i < 24; i++) addPart(outletX(o) + rand(-20, 20), ceil, rand(-160, 160), rand(20, 200), rand(0.4, 0.9), rand(2, 4), hueOf(b.level), 90, 70, true);
+    newOrder(o);
+  }
+  function updateOutlets(dt) {
+    const half = (colW * T.outletFrac) / 2;
+    for (const o of G.outlets) {
+      o.cool = Math.max(0, o.cool - dt);
+      o.flash = Math.max(0, o.flash - dt * 2);
+      o.hot = false;
+      if (o.cool > 0) continue;
+      const ox = outletX(o);
+      for (const b of G.bubbles) {
+        if (b.dead || b.level !== o.level) continue;
+        const dx = ox - b.x;
+        if (Math.abs(dx) < half + b.r && b.y - b.r < ceil + b.r * 1.5) {
+          o.hot = true;
+          b.vx += dx * 3 * dt;
+          b.vy -= T.suction * scale * dt;
+          if (b.y - b.r <= ceil + 3 && Math.abs(dx) < half + b.r * 0.35) { deliver(b, o); break; }
+        }
+      }
+    }
+    if (G.bubbles.some((b) => b.dead)) G.bubbles = G.bubbles.filter((b) => !b.dead);
+    for (let i = G.sucking.length - 1; i >= 0; i--) {
+      const s = G.sucking[i];
+      s.t += dt * 3;
+      if (s.t >= 1) G.sucking.splice(i, 1);
+    }
+  }
 
   // ---------- Bubbles ----------
   let uid = 0;
@@ -204,11 +265,12 @@
   }
 
   let aimX = 0;
-  function fire() {
+  function fire(power = 0.2) {
     if (state !== "play" || G.cooldown > 0) return;
     const r = radiusOf(G.cur);
     const x = clamp(aimX, colL + r, colR - r);
-    G.bubbles.push(makeBubble(G.cur, x, nozzleY - r * 0.4, 0, -T.launchSpeed * scale, r * 0.6));
+    G.bubbles.push(makeBubble(G.cur, x, nozzleY - r * 0.4, 0, -lerp(T.launchMin, T.launchMax, power) * scale, r * 0.6));
+    if (power > 0.6) for (let i = 0; i < 12; i++) addPart(x, nozzleY - r, rand(-40, 40), rand(-500, -200), 0.35, 2, 40, 100, 70, true);
     for (let i = 0; i < 10; i++) addPart(x + rand(-10, 10), nozzleY, rand(-50, 50), rand(-120, -30), 0.7, rand(4, 9), 30, 8, 60, false);
     G.cur = G.next; G.next = rollLevel();
     G.cooldown = T.cooldown;
@@ -319,16 +381,21 @@
   cv.addEventListener("pointerdown", (e) => {
     if (state !== "play") return;
     pressed = true; setAim(e);
+    G.charging = true; G.charge = 0;
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     e.preventDefault();
   });
-  cv.addEventListener("pointerup", (e) => { if (pressed) { setAim(e); fire(); } pressed = false; });
-  cv.addEventListener("pointercancel", () => { pressed = false; });
+  cv.addEventListener("pointerup", (e) => { if (pressed) { setAim(e); fire(G.charge); } pressed = false; G.charging = false; G.charge = 0; });
+  cv.addEventListener("pointercancel", () => { pressed = false; G.charging = false; G.charge = 0; });
   addEventListener("keydown", (e) => {
     if (state !== "play") return;
     if (e.key === "ArrowLeft") aimX = clamp(aimX - colW * 0.04, colL, colR);
     else if (e.key === "ArrowRight") aimX = clamp(aimX + colW * 0.04, colL, colR);
-    else if (e.key === " " || e.key === "Enter") { fire(); e.preventDefault(); }
+    else if (e.key === " ") { if (!e.repeat) { G.charging = true; G.charge = 0; } e.preventDefault(); }
+    else if (e.key === "Enter") { fire(0.2); e.preventDefault(); }
+  });
+  addEventListener("keyup", (e) => {
+    if (e.key === " " && state === "play" && G.charging) { fire(G.charge); G.charging = false; G.charge = 0; }
   });
 
   function begin() {
@@ -360,6 +427,8 @@
       const sub = dt / T.substeps;
       for (let i = 0; i < T.substeps; i++) step(sub);
       for (const b of G.bubbles) { b.age += dt; b.pop = Math.max(0, b.pop - dt * 4); }
+      if (G.charging) G.charge = Math.min(1, G.charge + dt / T.chargeTime);
+      if (state === "play") updateOutlets(dt);
 
       // depth of the settled pile
       let depth = ceil;
@@ -420,12 +489,13 @@
     $("r-score").textContent = fmt(G.score);
     $("r-best").textContent = fmt(best);
     $("r-big").textContent = label(G.biggest);
-    $("r-merges").textContent = fmt(G.merges);
+    $("r-merges").textContent = fmt(G.shipped);
     const tips = [
-      "Keep the big bubbles in one corner of the ceiling and build toward them.",
+      "Build each order right under its pipe so the merge lands it straight in.",
+      "A charged shot can knock a blocking bubble out from under a pipe.",
       "Watch the NEXT bubble on the machine before you aim.",
       "Merges that set off more merges score a chain bonus.",
-      "A small bubble launched under a big one gets trapped. Aim for open ceiling.",
+      "Orders follow your biggest bubble. Shipping big numbers is where the points are.",
     ];
     $("r-tip").textContent = tips[(Math.random() * tips.length) | 0];
     ui.over.hidden = false;
@@ -450,6 +520,25 @@
     ctx.beginPath();
     ctx.moveTo(colL, machineTop); ctx.lineTo(colL, ceil); ctx.lineTo(colR, ceil); ctx.lineTo(colR, machineTop);
     ctx.stroke();
+
+    // ceiling beam with outlets
+    const beamH = 24, half = (colW * T.outletFrac) / 2;
+    const bg = ctx.createLinearGradient(0, ceil - beamH, 0, ceil);
+    bg.addColorStop(0, "#2b3240"); bg.addColorStop(1, "#1a2029");
+    ctx.fillStyle = bg; ctx.fillRect(colL - 6, ceil - beamH, colW + 12, beamH);
+    ctx.fillStyle = "#9c7d40"; ctx.fillRect(colL - 6, ceil - 2, colW + 12, 2);
+    for (const o of G.outlets) {
+      const ox = outletX(o), hue = hueOf(o.level);
+      ctx.fillStyle = "#05070a"; ctx.fillRect(ox - half, ceil - beamH, half * 2, beamH);
+      const glow = 0.25 + (o.hot ? 0.35 + 0.25 * Math.sin(G.t * 10) : 0) + o.flash * 0.6;
+      const mg = ctx.createLinearGradient(0, ceil - beamH, 0, ceil);
+      mg.addColorStop(0, `hsla(${hue}, 90%, 60%, 0)`); mg.addColorStop(1, `hsla(${hue}, 90%, 60%, ${o.cool > 0 ? 0.1 : glow})`);
+      ctx.fillStyle = mg; ctx.fillRect(ox - half, ceil - beamH, half * 2, beamH);
+      ctx.fillStyle = "#b8924a";
+      ctx.fillRect(ox - half - 5, ceil - beamH - 3, 5, beamH + 5);
+      ctx.fillRect(ox + half, ceil - beamH - 3, 5, beamH + 5);
+      if (o.cool <= 0) drawBubble(ox, ceil - beamH - 2, 15, o.level, 1, 0, o.hot ? 0.3 + 0.3 * Math.sin(G.t * 10) : 0);
+    }
 
     // danger line
     const warn = state === "play" ? clamp(G.dangerT / T.dangerGrace, 0, 1) : 0;
@@ -523,7 +612,14 @@
     ctx.fillRect(x - cw / 2 - 4, machineTop - ch - 5, cw + 8, 6);
     // loaded bubble
     const ready = 1 - G.cooldown / T.cooldown;
-    drawBubble(x, nozzleY - r * 0.4 * ready, r * (0.6 + 0.4 * ready), G.cur, 0.4 + 0.6 * ready, G.t * 3);
+    const by = nozzleY - r * 0.4 * ready;
+    drawBubble(x, by, r * (0.6 + 0.4 * ready) * (1 - G.charge * 0.08), G.cur, 0.4 + 0.6 * ready, G.t * 3);
+    if (G.charging && G.charge > 0.05) {
+      ctx.beginPath();
+      ctx.arc(x, by, r + 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * G.charge);
+      ctx.strokeStyle = `hsl(${lerp(45, 8, G.charge)}, 100%, 60%)`;
+      ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.stroke();
+    }
   }
 
   function drawMachine() {
@@ -582,6 +678,10 @@
   function render() {
     drawBackground();
     for (const b of G.bubbles) drawBubble(b.x, b.y, b.r, b.level, Math.min(1, b.age * 6 + 0.3), G.t * 2 + b.wob, b.pop);
+    for (const s of G.sucking) {
+      const e = s.t * s.t;
+      drawBubble(lerp(s.x, s.tx, e), lerp(s.y, ceil - 12, e), s.r * (1 - e * 0.85), s.level, 1 - e);
+    }
 
     ctx.globalCompositeOperation = "lighter";
     for (const p of G.parts) {
@@ -626,7 +726,8 @@
       ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.85;
       ctx.fillStyle = "#efe7d4";
       ctx.font = `600 ${Math.round(15 * scale + 4)}px "Familjen Grotesk", sans-serif`;
-      ctx.fillText("Aim along the bottom, tap to release.", W / 2, (ceil + dangerY) / 2);
+      ctx.fillText("Tap for a puff. Hold to charge a hard shot.", W / 2, (ceil + dangerY) / 2);
+      ctx.fillText("Fill the orders on the ceiling pipes.", W / 2, (ceil + dangerY) / 2 + 28);
       ctx.globalAlpha = 1;
     }
   }
@@ -653,7 +754,7 @@
 
   // Test hook for automated checks
   window.__ringWeaver = {
-    get G() { return G; }, get state() { return state; }, begin, fire,
+    get G() { return G; }, get state() { return state; }, begin, fire, deliver, outletX,
     aim(x) { aimX = x; }, layout() { return { colL, colR, ceil, dangerY, nozzleY }; },
   };
 })();
