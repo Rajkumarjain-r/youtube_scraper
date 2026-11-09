@@ -3,9 +3,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@400;600;700;800&display=swap">
 <style>
-  /* Layout: full-bleed canvas of deep space scrolling upward forever; HUD strip on top (score, Light meter, chain); booster tray at the bottom; card overlays. Single dark look by choice. */
+  /* Layout: full-bleed canvas of space scrolling upward forever; HUD strip on top; booster tray at the bottom; card overlays for home, hangar, daily reward, how-to and results. Single dark look by choice. */
   :root {
     color-scheme: dark;
     --void: #070913;
@@ -15,6 +15,7 @@
     --ice: #bfe8ff;
     --wake: #6fd6ff;
     --sun: #ffc861;
+    --alien: #8cffb4;
     --ink: #e9ecff;
     --ink-dim: #9aa2c8;
     --danger: #ff4f7a;
@@ -29,29 +30,28 @@
     padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
-    display: grid; grid-template-columns: auto minmax(0, 340px) auto; justify-content: space-between; align-items: start; gap: 14px;
+    display: grid; grid-template-columns: auto minmax(0, 320px) auto; justify-content: space-between; align-items: start; gap: 14px;
   }
   .stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .stat.right { align-items: flex-end; text-align: right; }
   .label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
-  .value { font-weight: 800; font-size: clamp(20px, 4.5vw, 30px); line-height: 1.05; font-variant-numeric: tabular-nums; }
-  .chain { display: flex; align-items: center; gap: 6px; }
-  .dust { font-weight: 800; font-size: 13px; color: var(--sun); font-variant-numeric: tabular-nums; }
+  .value { font-weight: 800; font-size: clamp(20px, 4.5vw, 30px); line-height: 1.05; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
+  .value small { font-size: 12px; color: var(--sun); font-weight: 800; }
+  .coins { font-weight: 800; font-size: 13px; color: var(--sun); font-variant-numeric: tabular-nums; }
+  .chain i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-dim); display: inline-block; align-self: center; }
+  .fuel { display: flex; flex-direction: column; gap: 5px; padding-top: 2px; }
+  .fuel-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .lv { font-weight: 800; font-size: 12px; line-height: 1; color: var(--sun); letter-spacing: 0.06em; }
+  .meter { position: relative; height: 10px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+  .meter > i { position: absolute; inset: 0 auto 0 0; width: 60%; background: linear-gradient(90deg, #ff9a5a, var(--sun) 40%, var(--ice)); border-radius: 6px; }
+  .meter.low > i { background: var(--danger); }
+  .xp { height: 3px; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
+  .xp > i { display: block; height: 100%; width: 0%; background: var(--sun); }
   .mute {
     position: fixed; z-index: 2; top: calc(env(safe-area-inset-top, 0px) + 66px); right: max(16px, env(safe-area-inset-right, 0px));
     font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--ink-dim); background: rgba(16, 20, 42, 0.7); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer;
   }
-  .mute:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
-  .chain i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-dim); display: inline-block; }
-  .light { display: flex; flex-direction: column; gap: 5px; padding-top: 2px; }
-  .light-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .lv { font-weight: 800; font-size: 12px; line-height: 1; color: var(--sun); letter-spacing: 0.06em; }
-  .meter { position: relative; height: 10px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
-  .meter > i { position: absolute; inset: 0 auto 0 0; width: 70%; background: linear-gradient(90deg, #ff9a5a, var(--sun) 40%, var(--ice)); border-radius: 6px; }
-  .meter.low > i { background: var(--danger); }
-  .xp { height: 3px; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
-  .xp > i { display: block; height: 100%; width: 0%; background: var(--sun); }
 
   .tray {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
@@ -63,118 +63,211 @@
   .tray button {
     pointer-events: auto; position: relative; flex: 1 1 0; max-width: 104px; min-width: 0;
     display: flex; flex-direction: column; align-items: center; gap: 2px;
-    font: inherit; font-size: 11px; font-weight: 600; color: var(--ink);
+    font: inherit; font-size: 11px; font-weight: 700; color: var(--ink);
     background: rgba(16, 20, 42, 0.86); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px 6px; cursor: pointer;
   }
   .tray button svg { width: 24px; height: 24px; }
-  .tray button .count {
+  .count {
     position: absolute; top: -7px; right: -5px; min-width: 20px; height: 20px; border-radius: 10px; padding: 0 5px; box-sizing: border-box;
     background: var(--sun); color: var(--void); font-weight: 800; font-size: 12px; line-height: 20px; text-align: center;
   }
   .tray button:disabled { opacity: 0.38; cursor: default; }
   .tray button.on { border-color: var(--wake); box-shadow: 0 0 0 1px var(--wake) inset; }
-  .tray button:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
   .tray button:not(:disabled):hover { background: rgba(30, 36, 72, 0.95); }
+  button:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
 
   .overlay {
     position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; overflow-y: auto;
-    padding-block: 24px;
+    padding-block: 20px;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
-    background: rgba(5, 7, 16, 0.62);
+    background: rgba(5, 7, 16, 0.66);
     backdrop-filter: blur(2px);
   }
   .card {
-    width: 100%; max-width: 430px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px;
+    width: 100%; max-width: 440px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   }
-  .card h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(48px, 13vw, 68px); line-height: 0.9; letter-spacing: -0.01em; color: var(--ice); }
-  .card h1.bad { color: var(--sun); font-size: clamp(30px, 8vw, 42px); text-wrap: balance; }
+  .card h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(48px, 13vw, 66px); line-height: 0.9; color: var(--ice); }
+  .card h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 28px; color: var(--ice); }
+  .card h1.bad { color: var(--alien); font-size: clamp(36px, 10vw, 48px); }
   .card p { margin: 0; line-height: 1.5; }
-  .card .lede { color: var(--ink-dim); }
-  .rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 14px; }
-  .rules li { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: baseline; line-height: 1.45; }
-  .rules b { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wake); }
-  .rules b.gold { color: var(--sun); }
-  .rules b.bad { color: var(--danger); }
-  .rules span { min-width: 0; }
-  .results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .results div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .results b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lede { color: var(--ink-dim); }
+  .small { font-size: 12.5px; }
+  .wallet { display: flex; gap: 14px; flex-wrap: wrap; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .wallet .c { color: var(--sun); } .wallet .s { color: #b9a7ff; } .wallet .b { color: var(--ink-dim); font-weight: 600; }
+  .wallet .b b { color: var(--ink); }
+
+  .missions { display: flex; flex-direction: column; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .m-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .mult { font-weight: 800; color: var(--sun); font-size: 13px; }
+  .mlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .mlist li { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; font-size: 13.5px; }
+  .mlist .tick { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); box-sizing: border-box; }
+  .mlist li.done .tick { background: var(--alien); border-color: var(--alien); }
+  .mlist li.done span:nth-child(2) { color: var(--ink-dim); text-decoration: line-through; }
+  .mlist .prog { font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 12px; font-weight: 700; }
+
   .actions { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1 1 0; }
   button.go {
     font: inherit; font-weight: 800; font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--void); background: var(--ice); border: 0; border-radius: 999px; padding: 14px 18px; cursor: pointer;
   }
-  button.go.alt { background: var(--sun); }
-  button.go:hover { filter: brightness(1.08); }
-  button.go:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
+  button.go.alt { background: var(--alien); }
+  button.go:disabled { opacity: 0.45; cursor: default; }
+  button.ghost {
+    font: inherit; font-weight: 700; font-size: 14px; color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px; padding: 11px 14px; cursor: pointer;
+  }
+  button.ghost:hover, button.go:not(:disabled):hover { filter: brightness(1.12); }
+
+  .rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 14px; }
+  .rules li { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: baseline; line-height: 1.45; }
+  .rules b { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wake); }
+  .rules b.gold { color: var(--sun); } .rules b.bad { color: var(--alien); }
+  .rules span { min-width: 0; }
+
+  .results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .results div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .results b { font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  .tabs { display: flex; gap: 6px; background: var(--panel-2); border-radius: 999px; padding: 4px; }
+  .tabs button { flex: 1 1 0; font: inherit; font-weight: 700; font-size: 13px; color: var(--ink-dim); background: transparent; border: 0; border-radius: 999px; padding: 8px 6px; cursor: pointer; }
+  .tabs button.on { background: var(--line); color: var(--ink); }
+  .shop { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; }
+  .item { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  .item .ico { display: grid; place-items: center; }
+  .item .txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .item .txt b { font-size: 14px; }
+  .item .txt span { font-size: 12px; color: var(--ink-dim); }
+  .pips { display: flex; gap: 3px; margin-top: 3px; }
+  .pips i { width: 14px; height: 4px; border-radius: 2px; background: var(--line); }
+  .pips i.on { background: var(--sun); }
+  .buy { font: inherit; font-weight: 800; font-size: 13px; color: var(--void); background: var(--sun); border: 0; border-radius: 999px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+  .buy.equip { background: var(--ice); }
+  .buy:disabled { background: var(--line); color: var(--ink-dim); cursor: default; }
+
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); font-size: 11px; color: var(--ink-dim); text-align: center; min-width: 0; }
+  .day b { font-size: 13px; color: var(--sun); }
+  .day.got { opacity: 0.5; }
+  .day.today { border-color: var(--sun); box-shadow: 0 0 0 1px var(--sun) inset; color: var(--ink); }
   [hidden] { display: none !important; }
 </style>
 
 <canvas id="game" aria-label="Wake play field"></canvas>
 
 <div class="hud" aria-live="polite">
-  <div class="stat"><span class="label">Score</span><span class="value" id="score">0</span><span class="dust" id="dust">✦ 0</span></div>
-  <div class="light">
-    <div class="light-row"><span class="label">Light</span><span class="lv" id="lv">LV 1</span></div>
-    <div class="meter" id="meter"><i id="lightbar"></i></div>
-    <div class="xp" title="Progress to next comet level"><i id="xpbar"></i></div>
+  <div class="stat"><span class="label">Score</span><span class="value"><span id="score">0</span><small id="mult">×1</small></span><span class="coins" id="coins">◉ 0</span></div>
+  <div class="fuel">
+    <div class="fuel-row"><span class="label">Fuel</span><span class="lv" id="lv">LV 1</span></div>
+    <div class="meter" id="meter"><i id="fuelbar"></i></div>
+    <div class="xp" title="Progress to next rocket level"><i id="xpbar"></i></div>
   </div>
   <div class="stat right"><span class="label">Chain</span><span class="value chain"><i id="chaindot"></i><span id="chain">×1</span></span></div>
 </div>
-
 <button class="mute" id="mute" type="button" aria-pressed="false">Sound on</button>
 
 <div class="tray" id="tray">
-  <button type="button" id="b-flare" data-b="flare" title="Flare: restore half your Light (key 1)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="#ffc861" stroke="#ffc861"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="#ffc861"/></svg>
-    Flare<span class="count" id="c-flare">2</span></button>
-  <button type="button" id="b-lens" data-b="lens" title="Gravity Lens: your next 3 shots curve onto a good star (key 2)">
+  <button type="button" id="b-flare" data-b="flare" title="Flare: +50 fuel (key 1)">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="#ffc861" stroke="#ffc861"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="#ffc861"/></svg>
+    Flare<span class="count" id="c-flare">0</span></button>
+  <button type="button" id="b-lens" data-b="lens" title="Lens: your next 3 shots curve onto a good star (key 2)">
     <svg viewBox="0 0 24 24" fill="none" stroke="#6fd6ff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M4 20c4-2 7-5 8-8"/></svg>
-    Lens<span class="count" id="c-lens">2</span></button>
+    Lens<span class="count" id="c-lens">0</span></button>
   <button type="button" id="b-rewind" data-b="rewind" title="Rewind: undo your last tap (key 3)">
     <svg viewBox="0 0 24 24" fill="none" stroke="#e9ecff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>
-    Rewind<span class="count" id="c-rewind">2</span></button>
-  <button type="button" id="b-nova" data-b="nova" title="Supernova: absorb every star nearby and clear your trail (key 4)">
+    Rewind<span class="count" id="c-rewind">0</span></button>
+  <button type="button" id="b-nova" data-b="nova" title="Nova: absorb every star nearby and clear your trail (key 4)">
     <svg viewBox="0 0 24 24" fill="none" stroke="#ff8fb1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.2 6.3L21 9l-5.2 4.2L17.5 21 12 17l-5.5 4 1.7-7.8L3 9l6.8-.7z"/></svg>
-    Nova<span class="count" id="c-nova">2</span></button>
+    Nova<span class="count" id="c-nova">0</span></button>
 </div>
 
-<div class="overlay" id="title">
+<!-- Home -->
+<div class="overlay" id="home">
   <div class="card">
+    <div class="wallet"><span class="c">◉ <span id="h-coins">0</span></span><span class="s">◆ <span id="h-shards">0</span></span><span class="b">Best <b id="h-best">0</b></span></div>
     <h1>Wake</h1>
-    <p class="lede">Your comet is burning out, and the Devourer is climbing after it. Hop from star to star to keep your Light alive. The less Light you have, the closer it gets.</p>
-    <ul class="rules">
-      <li><b>Tap</b><span>Break orbit and fly along the dotted line. The preview shows what that tap will get you.</span></li>
-      <li><b class="gold">Fuel</b><span>Landing on a star absorbs its sparks (the dots) and refills your Light. Used stars go grey.</span></li>
-      <li><b class="gold">Chain</b><span>Land on the same colour again and again to multiply everything you absorb.</span></li>
-      <li><b class="gold">Lasso</b><span>Cross your own trail around stars to absorb them all at once. Crossing it around nothing snags you and costs Light.</span></li>
-      <li><b class="gold">Dust</b><span>Fly through stardust streams for points and a little Light. The preview counts the dust (✦) on each shot.</span></li>
-      <li><b class="gold">Pickups</b><span><b class="gold">Jet</b> autopilots you upward, <b class="gold">Magnet</b> pulls in dust, <b class="gold">2×</b> doubles score, <b class="gold">Shield</b> blocks one mistake.</span></li>
-      <li><b class="bad">Mistakes</b><span>Misses, snags and hazards feed the Devourer. A second mistake within 4 seconds and it lunges for double.</span></li>
-    </ul>
-    <p class="lede">The first 20 jumps are a warm-up. After that the pace climbs. Four boosters at the bottom help when you're stuck.</p>
-    <button class="go" id="start" type="button">Launch</button>
+    <p class="lede">Slingshot your rocket from star to star and keep it fuelled. The aliens are right behind you.</p>
+    <div class="missions">
+      <div class="m-head"><span class="label">Missions</span><span class="mult" id="h-mult">Score ×1</span></div>
+      <ol class="mlist" id="h-missions"></ol>
+      <p class="lede small">Finish all three to raise your score multiplier for good.</p>
+    </div>
+    <div class="actions">
+      <button class="go" id="start" type="button">Launch</button>
+      <div class="row"><button class="ghost" id="open-hangar" type="button">Hangar</button><button class="ghost" id="open-help" type="button">How to play</button></div>
+    </div>
   </div>
 </div>
 
+<!-- How to play -->
+<div class="overlay" id="help" hidden>
+  <div class="card">
+    <h2>How to play</h2>
+    <ul class="rules">
+      <li><b>Tap</b><span>Leave orbit along the dotted line. The label on the target star shows what that tap gets you.</span></li>
+      <li><b class="gold">Fuel</b><span>The dots around a star are fuel cells. Land on it to refuel. Grey stars are empty.</span></li>
+      <li><b class="gold">Chain</b><span>Land on the same colour again and again to multiply fuel and score.</span></li>
+      <li><b class="gold">Coins</b><span>Coins sit on part of each orbit. Circle longer to grab them, but every second burns fuel.</span></li>
+      <li><b class="gold">Lasso</b><span>Cross your exhaust trail around stars to take them all at once. Crossing around nothing snags you.</span></li>
+      <li><b class="bad">Aliens</b><span>Their ship closes in as your fuel drops. Misses and snags let it gain. Two mistakes within 4 seconds and the beam lunges for double.</span></li>
+      <li><b>Pickups</b><span>JET autopilots you, MAG pulls in coins, 2× doubles score, SHLD blocks one mistake.</span></li>
+    </ul>
+    <p class="lede small">The first 20 jumps are a warm-up. After that the pace rises every 20 jumps.</p>
+    <button class="go" id="close-help" type="button">Got it</button>
+  </div>
+</div>
+
+<!-- Hangar -->
+<div class="overlay" id="hangar" hidden>
+  <div class="card">
+    <div class="m-head"><h2>Hangar</h2><span class="wallet"><span class="c">◉ <span id="g-coins">0</span></span><span class="s">◆ <span id="g-shards">0</span></span></span></div>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="rockets" class="on">Rockets</button>
+      <button type="button" data-tab="upgrades">Upgrades</button>
+      <button type="button" data-tab="boosters">Boosters</button>
+    </div>
+    <div class="shop" id="shop"></div>
+    <p class="lede small">Coin packs for real money come with the app-store build. For now everything is earned in play.</p>
+    <button class="go" id="close-hangar" type="button">Done</button>
+  </div>
+</div>
+
+<!-- Daily reward -->
+<div class="overlay" id="daily" hidden>
+  <div class="card">
+    <h2>Daily reward</h2>
+    <p class="lede" id="d-text">Come back every day. Miss a day and the streak starts over.</p>
+    <div class="days" id="days"></div>
+    <button class="go alt" id="claim" type="button">Claim</button>
+  </div>
+</div>
+
+<!-- Results -->
 <div class="overlay" id="over" hidden>
   <div class="card">
-    <h1 class="bad">The Devourer caught you</h1>
+    <h1 class="bad">Abducted!</h1>
+    <p class="lede" id="r-why">The aliens caught your rocket.</p>
     <div class="results">
       <div><span class="label">Score</span><b id="r-score">0</b></div>
       <div><span class="label">Best</span><b id="r-best">0</b></div>
+      <div><span class="label">Coins</span><b id="r-coins">0</b></div>
       <div><span class="label">Distance</span><b id="r-dist">0</b></div>
       <div><span class="label">Best chain</span><b id="r-chain">0</b></div>
-      <div><span class="label">Stardust</span><b id="r-dust">0</b></div>
       <div><span class="label">Sector</span><b id="r-sector">1</b></div>
     </div>
-    <p class="lede" id="r-tip"></p>
+    <div class="missions">
+      <div class="m-head"><span class="label">Missions</span><span class="mult" id="r-mult">Score ×1</span></div>
+      <ol class="mlist" id="r-missions"></ol>
+    </div>
     <div class="actions">
-      <button class="go alt" id="revive" type="button">Second Wind · relight at 30%</button>
+      <button class="go alt" id="revive" type="button">Second Wind · ◆ 1</button>
       <button class="go" id="restart" type="button">Launch again</button>
+      <div class="row"><button class="ghost" id="over-hangar" type="button">Hangar</button><button class="ghost" id="over-home" type="button">Home</button></div>
     </div>
   </div>
 </div>
@@ -186,41 +279,98 @@
   // ---------- Tuning ----------
   const T = {
     speed: 240,
-    calmJumps: 20, calmMult: 0.8,   // learning phase: first 20 landings at 80% speed (and 80% drain)
-    stepJumps: 20, stepMult: 0.06, speedMax: 1.8, // then +6% every 20 landings, capped
+    calmJumps: 20, calmMult: 0.8,
+    stepJumps: 20, stepMult: 0.06, speedMax: 1.8,
     capMin: 54, capMax: 80, capPerLevel: 0.035,
+    lane: 0.78,                   // orbit radius settles to this fraction of the catch ring (coins sit here)
     orbitMinFrac: 0.55, bend: 0.06,
-    lightStart: 60,
-    drainBase: 1.6, drainPerLevel: 0.12, drainPerSector: 0.06, // Light per second
-    driftDrain: 5, dwarfDrain: 7, snagCost: 8, holeCost: 15,
-    sparkLight: 2.1, chainLightStep: 0.35, chainMax: 8,
-    sparkScore: 10, lassoBonus: 1.5,
-    missTime: 1.3,          // seconds of free flight before drifting kicks in
-    levelBase: 45, levelStep: 25, // Light absorbed per comet level
-    sectorLen: 2600,        // px climbed per sector (scaled)
+    fuelStart: 60,
+    drainBase: 1.6, drainPerLevel: 0.12, drainPerSector: 0.06,
+    driftDrain: 5, dwarfDrain: 7,
+    snagCost: 8, holeCost: 15, driftCost: 4, dwarfCost: 4, hungryTime: 4,
+    cellFuel: 2.1, chainFuelStep: 0.35, chainMax: 8, cellScore: 10, lassoBonus: 1.5,
+    missTime: 1.3,
+    levelBase: 45, levelStep: 25,
+    sectorLen: 2600,
     band: 135, sample: 5,
-    boostersStart: 2, flare: 50, novaRadius: 280, lensShots: 3, revive: 30,
-    dustSpacing: 20, dustLinkMax: 330, dustChance: 0.75, dustRadius: 17, dustLight: 0.25, dustScore: 2,
-    pickupChance: 0.12, pickupOnStream: 0.3, pickupRadius: 26,
-    jetTime: 7, jetSpeed: 1.6, magnetTime: 12, magnetRadius: 110, twinTime: 15,
-    hungryTime: 4, driftCost: 4, dwarfCost: 4,
+    coinScore: 2, ringBonus: 10, coinHit: 0.1,
+    pickupChance: 0.2, pickupRadius: 26,
+    jetSpeed: 1.6, magnetRadius: 120,
     shaveDist: 14, shavePoints: 50,
+    flare: 50, novaRadius: 280, lensShots: 3,
+    revive: 30,
   };
   const HUES = [200, 45, 330, 150];
+  const UPG = {
+    jet:    { name: "Comet Jet", unit: "s", base: 5, step: 1, desc: "Autopilot pickup lasts longer" },
+    magnet: { name: "Magnet", unit: "s", base: 8, step: 2, desc: "Coin magnet lasts longer" },
+    twin:   { name: "2× Score", unit: "s", base: 10, step: 2, desc: "Double score lasts longer" },
+    fuel:   { name: "Bigger tank", unit: "%", base: 60, step: 5, desc: "Start each run with more fuel" },
+  };
+  const UPG_PRICE = [300, 700, 1500, 3000, 6000];
+  const BOOST = {
+    flare: { name: "Flare", desc: "+50 fuel instantly", price: 400 },
+    lens: { name: "Lens", desc: "Next 3 shots curve onto a good star", price: 400 },
+    rewind: { name: "Rewind", desc: "Undo your last tap", price: 500 },
+    nova: { name: "Nova", desc: "Take every star nearby, wipe your trail", price: 700 },
+  };
+  const ROCKETS = [
+    { id: "pathfinder", name: "Pathfinder", price: 0, body: "#e9ecff", accent: "#6fd6ff", trail: "ice", trailName: "Ice trail" },
+    { id: "ember", name: "Ember", price: 1500, body: "#ff8a5c", accent: "#ffd36b", trail: "fire", trailName: "Fire trail" },
+    { id: "aurora", name: "Aurora", price: 3000, body: "#9ff0c8", accent: "#6fd6ff", trail: "rainbow", trailName: "Rainbow trail" },
+    { id: "phantom", name: "Phantom", price: 4500, body: "#b9a7ff", accent: "#ff8fb1", trail: "volt", trailName: "Lightning trail" },
+    { id: "goldrush", name: "Gold Rush", price: 8000, body: "#ffd36b", accent: "#fff3d1", trail: "gold", trailName: "Gold trail" },
+  ];
+  const DAILY = [
+    { coins: 100 }, { coins: 200 }, { coins: 300 }, { shards: 1 }, { coins: 500 }, { coins: 800 }, { coins: 1500, boosters: 1 },
+  ];
+  const MISSIONS = [
+    { id: "coins", stat: "coins", base: [60, 120, 200, 320], text: (n) => `Collect ${n} coins in one run` },
+    { id: "chain", stat: "chain", base: [3, 4, 5, 6], text: (n) => `Reach a ×${n} colour chain` },
+    { id: "lasso", stat: "lasso", base: [1, 2, 3, 4], text: (n) => n === 1 ? "Lasso a star with your trail" : `Lasso ${n} stars with one loop` },
+    { id: "jumps", stat: "jumps", base: [25, 40, 60, 85], text: (n) => `Make ${n} jumps in one run` },
+    { id: "sector", stat: "sector", base: [2, 3, 4, 5], text: (n) => `Reach sector ${n}` },
+    { id: "pickups", stat: "pickups", base: [2, 3, 5, 7], text: (n) => `Grab ${n} power-ups in one run` },
+    { id: "shaves", stat: "shaves", base: [1, 3, 5, 8], text: (n) => n === 1 ? "Get a close shave" : `Get ${n} close shaves in one run` },
+    { id: "rings", stat: "rings", base: [1, 3, 5, 8], text: (n) => n === 1 ? "Clear a full coin ring" : `Clear ${n} full coin rings in one run` },
+    { id: "score", stat: "score", base: [1500, 3000, 6000, 10000], text: (n) => `Score ${n.toLocaleString("en-US")} in one run` },
+  ];
 
   const cv = document.getElementById("game");
   const ctx = cv.getContext("2d");
   const $ = (id) => document.getElementById(id);
-  const ui = {
-    score: $("score"), lv: $("lv"), meter: $("meter"), lightbar: $("lightbar"), xpbar: $("xpbar"),
-    chain: $("chain"), chaindot: $("chaindot"), title: $("title"), over: $("over"), tray: $("tray"),
-  };
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const fmt = (n) => Math.floor(n).toLocaleString("en-US");
   const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const TAU = Math.PI * 2;
+
+  // ---------- Profile (saved between runs) ----------
+  const DEF = () => ({
+    coins: 0, shards: 3, best: 0, mult: 1, set: 0, missions: null, pendingNew: false,
+    upgrades: { jet: 0, magnet: 0, twin: 0, fuel: 0 },
+    boosters: { flare: 3, lens: 3, rewind: 3, nova: 3 },
+    owned: ["pathfinder"], rocket: "pathfinder", daily: { last: "", streak: 0 },
+  });
+  let P = DEF();
+  try {
+    const saved = JSON.parse(localStorage.getItem("wake.profile") || "null");
+    if (saved) P = Object.assign(DEF(), saved, { upgrades: Object.assign(DEF().upgrades, saved.upgrades), boosters: Object.assign(DEF().boosters, saved.boosters) });
+  } catch (e) {}
+  function save() { try { localStorage.setItem("wake.profile", JSON.stringify(P)); } catch (e) {} }
+  const upg = (k) => UPG[k].base + UPG[k].step * P.upgrades[k];
+  const skin = () => ROCKETS.find((r) => r.id === P.rocket) || ROCKETS[0];
+
+  function newMissionSet() {
+    const tier = Math.min(3, Math.floor(P.set / 2));
+    const pool = MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+    P.missions = pool.map((m) => ({ id: m.id, target: m.base[tier], progress: 0, done: false }));
+    P.pendingNew = false;
+    save();
+  }
+  if (!P.missions) newMissionSet();
+  const mdef = (m) => MISSIONS.find((x) => x.id === m.id);
 
   // ---------- Layout ----------
   let W = 0, H = 0, DPR = 1, PW = 0, colL = 0, S = 1;
@@ -235,43 +385,11 @@
   }
   addEventListener("resize", resize);
   resize();
-
   const dust = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random(), d: rand(0.05, 0.35), s: rand(0.5, 1.6), a: rand(0.2, 0.8) }));
-
-  // ---------- Geometry ----------
-  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-  function segHit(a, b, c, d) {
-    const d1 = orient(c, d, a), d2 = orient(c, d, b), d3 = orient(a, b, c), d4 = orient(a, b, d);
-    if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 !== 0 && d2 !== 0) {
-      const t = d3 / (d3 - d4);
-      return { x: c.x + (d.x - c.x) * t, y: c.y + (d.y - c.y) * t, u: d1 / (d1 - d2) };
-    }
-    return null;
-  }
-  function distSeg(p, a, b) {
-    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
-    const t = l2 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / l2, 0, 1) : 0;
-    return Math.hypot(a.x + dx * t - p.x, a.y + dy * t - p.y);
-  }
-  function inside(pt, poly) {
-    let c = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const a = poly[i], b = poly[j];
-      if (((a.y > pt.y) !== (b.y > pt.y)) && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) c = !c;
-    }
-    return c;
-  }
-  function steer(c, tx, ty, rate, dt) {
-    const want = Math.atan2(ty - c.y, tx - c.x), cur = Math.atan2(c.vy, c.vx);
-    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-    const a = cur + clamp(d, -rate * dt, rate * dt);
-    const v = Math.hypot(c.vx, c.vy);
-    c.vx = Math.cos(a) * v; c.vy = Math.sin(a) * v;
-  }
 
   // ---------- Sound ----------
   const AudioC = window.AudioContext || window.webkitAudioContext;
-  let ac = null, muted = false, lastDustSfx = 0;
+  let ac = null, muted = false, lastCoinSfx = 0;
   try { muted = localStorage.getItem("wake.muted") === "1"; } catch (e) {}
   function initAudio() {
     if (!ac && AudioC) { try { ac = new AudioC(); } catch (e) { ac = null; } }
@@ -301,63 +419,105 @@
         tone(f, 0.4, "sine", 0.14); tone(f * 2, 0.22, "triangle", 0.035); break;
       }
       case "empty": tone(196, 0.14, "triangle", 0.05); break;
-      case "dust": {
+      case "coin": {
         const now = performance.now();
-        if (now - lastDustSfx < 45) return;
-        lastDustSfx = now;
-        tone(1300 + Math.random() * 500, 0.05, "sine", 0.025); break;
+        if (now - lastCoinSfx < 50) return;
+        lastCoinSfx = now;
+        tone(1568, 0.07, "square", 0.025); tone(2093, 0.09, "square", 0.02, 0, 0.04); break;
       }
+      case "ring": [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.14, "square", 0.03, 0, i * 0.05)); break;
       case "pickup": [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, "triangle", 0.07, 0, i * 0.06)); break;
       case "lasso": [523, 659, 784, 1047].forEach((f) => tone(f, 0.6, "sine", 0.06)); break;
       case "hit": tone(120, 0.3, "sawtooth", 0.07, 0.5); break;
-      case "lunge": tone(75, 0.7, "sawtooth", 0.12, 0.55); tone(56, 0.8, "square", 0.05, 0.6); break;
+      case "lunge": tone(300, 0.6, "sine", 0.1, 2.2); tone(56, 0.8, "square", 0.05, 0.6); break;
       case "shield": tone(900, 0.22, "square", 0.04, 0.5); break;
       case "shave": tone(1600, 0.1, "square", 0.03, 0.6); break;
       case "banner": tone(392, 0.35, "sine", 0.07); tone(523, 0.4, "sine", 0.07, 0, 0.12); break;
-      case "dark": tone(220, 1.3, "triangle", 0.12, 0.25); break;
+      case "mission": [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, "triangle", 0.07, 0, i * 0.07)); break;
+      case "dark": tone(200, 1.3, "sine", 0.12, 3); break;
       case "boost": tone(660, 0.25, "sine", 0.07, 1.5); break;
+      case "buy": tone(880, 0.12, "triangle", 0.07); tone(1320, 0.18, "triangle", 0.06, 0, 0.08); break;
     }
   }
-  const muteBtn = document.getElementById("mute");
+  const muteBtn = $("mute");
   function syncMute() { muteBtn.textContent = muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-pressed", String(muted)); }
   syncMute();
   muteBtn.addEventListener("click", () => { muted = !muted; try { localStorage.setItem("wake.muted", muted ? "1" : "0"); } catch (e) {} initAudio(); syncMute(); });
 
-  // ---------- State ----------
-  let state = "title"; // title | play | dark | over
+  // ---------- Geometry ----------
+  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  function segHit(a, b, c, d) {
+    const d1 = orient(c, d, a), d2 = orient(c, d, b), d3 = orient(a, b, c), d4 = orient(a, b, d);
+    if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 !== 0 && d2 !== 0) {
+      const t = d3 / (d3 - d4);
+      return { x: c.x + (d.x - c.x) * t, y: c.y + (d.y - c.y) * t };
+    }
+    return null;
+  }
+  function distSeg(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / l2, 0, 1) : 0;
+    return Math.hypot(a.x + dx * t - p.x, a.y + dy * t - p.y);
+  }
+  function inside(pt, poly) {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i], b = poly[j];
+      if (((a.y > pt.y) !== (b.y > pt.y)) && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+    }
+    return c;
+  }
+  function steer(c, tx, ty, rate, dt) {
+    const want = Math.atan2(ty - c.y, tx - c.x), cur = Math.atan2(c.vy, c.vx);
+    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    const a = cur + clamp(d, -rate * dt, rate * dt);
+    const v = Math.hypot(c.vx, c.vy);
+    c.vx = Math.cos(a) * v; c.vy = Math.sin(a) * v;
+  }
+  const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+  // ---------- Run state ----------
+  let state = "menu"; // menu | play | dark | over
   let G = null;
-  let best = 0;
-  try { best = Number(localStorage.getItem("wake.v2.best")) || 0; } catch (e) {}
 
   const sectorAt = (y) => 1 + Math.floor(Math.max(0, G.startY - y) / (T.sectorLen * S));
-  const captureR = (s) => s.capR * (1 + T.capPerLevel * (G.level - 1)) * (1 + 0.5 * Math.max(0, G.speedCur - 1));
   const speedTarget = () => G.jumps < T.calmJumps ? T.calmMult : Math.min(T.speedMax, 1 + T.stepMult * Math.floor((G.jumps - T.calmJumps) / T.stepJumps));
+  const captureR = (s) => s.capR * (1 + T.capPerLevel * (G.level - 1)) * (1 + 0.5 * Math.max(0, G.speedCur - 1));
   const speedNow = () => T.speed * S * G.speedCur * (G.power.jet > 0 ? T.jetSpeed : 1);
   const drainNow = () => T.drainBase * Math.min(1, G.speedCur) * (1 + T.drainPerLevel * (G.level - 1)) * (1 + T.drainPerSector * (G.sector - 1));
+  const laneR = (s) => clamp(T.lane * captureR(s), s.core * 2.5, Math.min(s.x - 6, PW - s.x - 6));
 
   function newStar(x, y, type = "star", hueIdx = 0) {
     const capR = rand(T.capMin, T.capMax) * S;
     const r = Math.random();
-    return {
+    const s = {
       x, y, type, capR, core: capR * rand(0.11, 0.15),
       hueIdx, hue: type === "dwarf" ? 5 : HUES[hueIdx],
-      sparks: type === "star" ? (r < 0.45 ? 1 : r < 0.8 ? 2 : 3) : 0,
-      used: false, pulse: 0, tw: rand(0, TAU), cool: 0,
+      cells: type === "star" ? (r < 0.45 ? 1 : r < 0.8 ? 2 : 3) : 0,
+      used: false, pulse: 0, tw: rand(0, TAU), cool: 0, coins: [],
     };
+    if (type === "star" && Math.random() < 0.85) {
+      const n = 6 + ((Math.random() * 7) | 0), span = rand(1.4, 3.4), a0 = rand(0, TAU);
+      for (let i = 0; i < n; i++) s.coins.push({ a: a0 + (span * i) / (n - 1), taken: false });
+    }
+    return s;
   }
 
   function newGame() {
+    if (P.pendingNew) newMissionSet();
+    for (const m of P.missions) if (!m.done) m.progress = 0;
     const first = newStar(PW / 2, 0, "star", 0);
     first.capR = T.capMax * S * 0.9;
     first.used = true;
     G = {
-      t: 0, sparkScore: 0, score: 0, light: T.lightStart, totalLight: 0, level: 1, nextLevelAt: T.levelBase,
-      chain: 1, lastHue: first.hue, bestChain: 1, bestLasso: 0, sector: 1,
-      stars: [first], genY: -first.capR * 1.2, genHue: 0, trail: [], parts: [], texts: [], flashes: [], rings: [],
+      t: 0, cellScore: 0, score: 0, fuel: upg("fuel"), totalFuel: 0, level: 1, nextLevelAt: T.levelBase,
+      chain: 1, lastHue: first.hue, sector: 1, mult: P.mult,
+      stars: [first], genY: -first.capR * 1.2, genHue: 0, trail: [], parts: [], texts: [], flashes: [], rings: [], pickups: [],
       camTop: -H * 0.58, startY: 0, maxClimb: 0, shake: 0, darkT: 0, banner: null, hintT: 9,
-      boosters: { flare: T.boostersStart, lens: T.boostersStart, rewind: T.boostersStart, nova: T.boostersStart },
-      lens: 0, snap: null, revived: false, preview: null, lowWarn: 0, jumps: 0, speedCur: T.calmMult,
-      dust: [], pickups: [], dustCount: 0, power: { jet: 0, magnet: 0, twin: 0, shield: 0 }, hungry: 0, lunge: 0, devGap: H * 0.6, shaveCd: 0,
+      lens: 0, snap: null, revived: false, preview: null, jumps: 0, speedCur: T.calmMult,
+      power: { jet: 0, magnet: 0, twin: 0, shield: 0 }, hungry: 0, lunge: 0, devGap: H * 0.6, shaveCd: 0, shipX: PW / 2,
+      coinsRun: 0, coinsBanked: 0,
+      stats: { coins: 0, chain: 1, lasso: 0, jumps: 0, sector: 1, pickups: 0, shaves: 0, rings: 0, score: 0 },
       c: { x: 0, y: 0, mode: "orbit", star: first, R: first.capR * 0.8, ang: Math.PI / 2, dir: -1, vx: 0, vy: 0, freeT: 0, ignore: null, acc: 0, orbitIdx: 0, drifting: false, homing: null },
     };
     const c = G.c;
@@ -379,7 +539,7 @@
       for (let k = 0; k < count; k++) {
         const r = Math.random();
         const type = r < pHole ? "hole" : r < pHole + pDwarf ? "dwarf" : "star";
-        let hi = Math.random() < bias ? G.genHue : (Math.random() * HUES.length) | 0;
+        const hi = Math.random() < bias ? G.genHue : (Math.random() * HUES.length) | 0;
         for (let tries = 0; tries < 14; tries++) {
           const s = newStar(0, 0, type, hi);
           const m = s.capR * 1.2 + 6;
@@ -387,8 +547,7 @@
           s.y = G.genY + rand(0, band);
           if (G.stars.every((o) => Math.hypot(o.x - s.x, o.y - s.y) > (o.capR + s.capR) * 0.95)) {
             G.stars.push(s);
-            if (type !== "hole") linkDust(s);
-            if (type === "star") G.genHue = hi;
+            if (type === "star") { G.genHue = hi; if (Math.random() < T.pickupChance) placePickupNear(s); }
             break;
           }
         }
@@ -396,84 +555,86 @@
     }
     const cut = G.camTop + H + 600;
     G.stars = G.stars.filter((s) => s.y < cut || s === G.c.star);
-    G.dust = G.dust.filter((d) => !d.taken && d.y < cut);
     G.pickups = G.pickups.filter((p) => !p.taken && p.y < cut);
   }
 
-  function linkDust(s) {
-    let o = null, bd = T.dustLinkMax * S;
+  // pickups sit on a tangent line between two stars, where a well-timed shot flies through
+  function placePickupNear(s) {
+    let o = null, bd = 330 * S;
     for (const t of G.stars) {
       if (t === s || t.type === "hole") continue;
       const d = Math.hypot(t.x - s.x, t.y - s.y);
       if (d < bd && t.y > s.y - 40) { bd = d; o = t; }
     }
-    if (!o || Math.random() > T.dustChance) {
-      if (Math.random() < T.pickupChance) placePickup(rand(30, PW - 30), s.y + rand(-60, 60));
-      return;
-    }
-    // stream along a tangent line, so a well-timed release flies straight through it
+    if (!o) return;
     const dx = s.x - o.x, dy = s.y - o.y, d = Math.hypot(dx, dy);
-    const ux = dx / d, uy = dy / d, nx = -uy, ny = ux;
-    const off = (Math.random() < 0.5 ? 1 : -1) * Math.min(o.capR, s.capR) * 0.78;
-    const t0 = o.capR * 0.9, t1 = d - s.capR * 0.55;
-    for (let t = t0; t < t1; t += T.dustSpacing * S) {
-      const x = o.x + ux * t + nx * off, y = o.y + uy * t + ny * off;
-      if (x < 8 || x > PW - 8) continue;
-      G.dust.push({ x, y, taken: false, ph: rand(0, TAU) });
-    }
-    if (Math.random() < T.pickupOnStream) placePickup(o.x + ux * (t0 + t1) / 2 + nx * off, o.y + uy * (t0 + t1) / 2 + ny * off);
-  }
-
-  function placePickup(x, y) {
+    const ux = dx / d, uy = dy / d;
+    const off = (Math.random() < 0.5 ? 1 : -1) * Math.min(o.capR, s.capR) * T.lane;
+    const x = (o.x + s.x) / 2 - uy * off, y = (o.y + s.y) / 2 + ux * off;
     if (x < 24 || x > PW - 24) return;
-    if (G.stars.some((s) => Math.hypot(s.x - x, s.y - y) < s.capR * 0.85)) return;
+    if (G.stars.some((t) => Math.hypot(t.x - x, t.y - y) < t.capR * 0.85)) return;
     const r = Math.random();
     const type = r < 0.22 ? "jet" : r < 0.5 ? "magnet" : r < 0.75 ? "twin" : "shield";
     G.pickups.push({ x, y, type, taken: false, bob: rand(0, TAU) });
   }
 
-  // ---------- Light, levels, scoring ----------
-  function addLight(x, countsForLevel = true) {
-    G.light = Math.min(100, G.light + x);
+  // ---------- Missions ----------
+  function stat(key, value) {
+    if (value <= G.stats[key]) return;
+    G.stats[key] = value;
+    for (const m of P.missions) {
+      if (m.done || mdef(m).stat !== key) continue;
+      m.progress = Math.max(m.progress, value);
+      if (m.progress >= m.target) {
+        m.done = true;
+        G.texts.push({ x: G.c.x, y: G.c.y - 70 * S, lines: ["MISSION COMPLETE", mdef(m).text(m.target)], color: "#8cffb4", life: 2.2, max: 2.2 });
+        sfx("mission");
+        if (P.missions.every((x) => x.done)) {
+          P.mult = Math.min(30, P.mult + 1);
+          P.shards += 1; P.coins += 250; P.set += 1; P.pendingNew = true;
+          banner("Mission set complete!", `Score multiplier ×${P.mult} from your next run · +1 ◆ · +250 ◉`);
+        }
+        save();
+      }
+    }
+  }
+
+  // ---------- Fuel, levels, scoring ----------
+  function addFuel(x, countsForLevel = true) {
+    G.fuel = Math.min(100, G.fuel + x);
     if (!countsForLevel) return;
-    G.totalLight += x;
-    while (G.totalLight >= G.nextLevelAt) {
+    G.totalFuel += x;
+    while (G.totalFuel >= G.nextLevelAt) {
       G.level++;
       G.nextLevelAt += T.levelBase + T.levelStep * (G.level - 1);
-      const keys = Object.keys(G.boosters);
+      const keys = Object.keys(P.boosters);
       const k = keys[(Math.random() * keys.length) | 0];
-      G.boosters[k]++;
-      const names = { flare: "Flare", lens: "Lens", rewind: "Rewind", nova: "Nova" };
-      banner(`Comet level ${G.level}`, `Wider reach, but burns hotter. +1 ${names[k]}`);
+      P.boosters[k]++; save();
+      banner(`Rocket level ${G.level}`, `Wider reach, but burns hotter. +1 ${BOOST[k].name}`);
       G.rings.push({ x: G.c.x, y: G.c.y, r: 10, life: 1, hue: 45 });
     }
   }
-  function loseLight(x, why, at) {
-    G.light -= x;
-    if (why) addText(at.x, at.y - 20, [why, "−" + Math.round(x) + " light"], "#ff7a9a", 1.2);
-  }
+  const twinM = () => (G.power.twin > 0 ? 2 : 1);
 
   function absorb(list, lassoN) {
     let sp = 0;
     for (const s of list) {
       if (s.used || s.type !== "star") continue;
-      sp += s.sparks;
+      sp += s.cells;
       s.used = true;
       s.pulse = 1;
       if (G.snap) G.snap.used.push(s);
-      for (let i = 0; i < 6 + s.sparks * 6; i++) {
+      for (let i = 0; i < 6 + s.cells * 6; i++) {
         const a = rand(0, TAU), v = rand(40, 180) * S;
         addPart(s.x, s.y, Math.cos(a) * v, Math.sin(a) * v, rand(0.4, 0.9), rand(1.4, 2.8), s.hue, 95, 72);
       }
     }
-    if (!sp) return { light: 0, score: 0 };
-    const chainM = 1 + T.chainLightStep * (G.chain - 1);
-    const lassoM = lassoN > 1 ? T.lassoBonus : 1;
-    const light = sp * T.sparkLight * chainM * lassoM;
-    const score = sp * T.sparkScore * G.chain * Math.max(1, lassoN) * (G.power.twin > 0 ? 2 : 1);
-    addLight(light);
-    G.sparkScore += score;
-    return { light, score };
+    if (!sp) return { fuel: 0, score: 0 };
+    const fuel = sp * T.cellFuel * (1 + T.chainFuelStep * (G.chain - 1)) * (lassoN > 1 ? T.lassoBonus : 1);
+    const score = sp * T.cellScore * G.chain * Math.max(1, lassoN) * twinM();
+    addFuel(fuel);
+    G.cellScore += score;
+    return { fuel, score };
   }
 
   function mistake(cost, label, at) {
@@ -485,19 +646,18 @@
       sfx("shield");
       return;
     }
-    const warm = G.jumps < T.calmJumps; // warm-up: half cost, no lunges
+    const warm = G.jumps < T.calmJumps;
     const lunge = !warm && G.hungry > 0;
     const c = cost * (lunge ? 2 : warm ? 0.5 : 1);
-    G.light -= c;
+    G.fuel -= c;
     if (!warm) G.hungry = T.hungryTime;
     G.lunge = 1;
     G.shake = Math.max(G.shake, lunge ? 0.55 : 0.25);
-    addText(at.x, at.y - 22, lunge ? [label, "IT LUNGES −" + Math.round(c)] : [label, "−" + Math.round(c) + " light"], "#ff7a9a", 1.3);
+    addText(at.x, at.y - 22, lunge ? [label, "BEAM LUNGES −" + Math.round(c)] : [label, "−" + Math.round(c) + " fuel"], "#ff7a9a", 1.3);
     sfx(lunge ? "lunge" : "hit");
   }
 
   function onLand(s) {
-    const c = G.c;
     if (s.type === "dwarf") {
       mistake(T.dwarfCost, "RED DWARF", { x: s.x, y: s.y - s.capR });
       G.chain = 1; G.lastHue = null;
@@ -508,13 +668,29 @@
     const broke = !same && G.chain > 1;
     G.chain = same ? Math.min(T.chainMax, G.chain + 1) : 1;
     G.lastHue = s.hue;
-    G.bestChain = Math.max(G.bestChain, G.chain);
+    stat("chain", G.chain);
     const r = absorb([s], 1);
-    const lines = ["+" + Math.round(r.light) + " light"];
+    const lines = ["+" + Math.round(r.fuel) + " fuel"];
     if (G.chain > 1) lines.unshift("CHAIN ×" + G.chain);
     else if (broke) lines.push("chain reset");
     addText(s.x, s.y - s.capR - 10, lines, `hsl(${s.hue}, 95%, 75%)`, 1.3);
     sfx("land", { idx: s.hueIdx, chain: G.chain });
+  }
+
+  function takeCoin(s, coin, wx, wy) {
+    coin.taken = true;
+    G.coinsRun++;
+    G.cellScore += T.coinScore * twinM();
+    stat("coins", G.coinsRun);
+    addPart(wx, wy, rand(-50, 50), rand(-60, -10), 0.4, 2, 45, 100, 70);
+    sfx("coin");
+    if (s.coins.length && s.coins.every((k) => k.taken)) {
+      G.coinsRun += T.ringBonus;
+      stat("rings", G.stats.rings + 1);
+      stat("coins", G.coinsRun);
+      addText(s.x, s.y - s.capR - 30, ["RING CLEARED", "+" + T.ringBonus + " ◉"], "#ffc861", 1.4);
+      sfx("ring");
+    }
   }
 
   // ---------- Trail ----------
@@ -531,8 +707,7 @@
         if (hit) { if (crossed(j, hit, p)) return; break; }
       }
       if (G.c.mode === "free" && G.shaveCd <= 0) {
-        const lim = tr.length - 30;
-        for (let j = 0; j < lim; j++) {
+        for (let j = 0; j < tr.length - 30; j++) {
           if (distSeg(p, tr[j], tr[j + 1]) < T.shaveDist * S) { closeShave(p); break; }
         }
       }
@@ -545,19 +720,19 @@
     const poly = [X, ...tr.slice(j + 1), p];
     const caught = G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly));
     if (!caught.length) {
+      if (G.power.jet > 0) return false;
       mistake(T.snagCost, "SNAG", X);
       for (let i = 0; i < 20; i++) addPart(X.x, X.y, rand(-150, 150), rand(-150, 150), rand(0.3, 0.7), 2, 340, 95, 65);
-      G.shake = 0.25;
-      return false; // keep the trail; the knot stays
+      return false;
     }
     const n = caught.length;
-    G.bestLasso = Math.max(G.bestLasso, n);
+    stat("lasso", n);
     const r = absorb(caught, n);
     G.flashes.push({ poly, life: 1 });
     G.shake = Math.min(0.5, 0.15 + n * 0.08);
     let cx = 0, cy = 0;
     caught.forEach((s) => { cx += s.x; cy += s.y; });
-    addText(cx / n, cy / n, [n > 1 ? `LASSO ×${n}` : "LASSO", "+" + Math.round(r.light) + " light", "+" + fmt(r.score)], "#ffc861", 1.8);
+    addText(cx / n, cy / n, [n > 1 ? `LASSO ×${n}` : "LASSO", "+" + Math.round(r.fuel) + " fuel", "+" + fmt(r.score)], "#ffc861", 1.8);
     sfx("lasso");
     G.trail = tr.slice(0, j + 1).concat([X, p]);
     if (G.c.mode === "orbit") { G.c.orbitIdx = G.trail.length - 1; G.c.acc = 0; }
@@ -566,8 +741,9 @@
 
   function closeShave(p) {
     G.shaveCd = 1.5;
-    const pts = T.shavePoints * (G.power.twin > 0 ? 2 : 1);
-    G.sparkScore += pts;
+    const pts = T.shavePoints * twinM();
+    G.cellScore += pts;
+    stat("shaves", G.stats.shaves + 1);
     addText(p.x, p.y - 18, ["CLOSE SHAVE", "+" + pts], "#e9ecff", 1.0);
     sfx("shave");
   }
@@ -578,7 +754,6 @@
     G.parts.push({ x, y, vx, vy, life, max: life, size, hue, sat, light });
   }
   function addText(x, y, lines, color, life = 1.4) {
-    // stack instead of overlapping recent messages
     for (let k = 0; k < 4; k++) {
       const clash = G.texts.some((t) => t.max - t.life < 0.6 && Math.abs(t.x - x) < 90 && Math.abs(t.y - y) < t.lines.length * 20 * S + 6);
       if (!clash) break;
@@ -586,7 +761,7 @@
     }
     G.texts.push({ x, y, lines, color, life, max: life });
   }
-  function banner(title, sub) { G.banner = { title, sub, life: 3.2, max: 3.2 }; sfx("banner"); }
+  function banner(title, sub) { G.banner = { title, sub, life: 3.4, max: 3.4 }; sfx("banner"); }
 
   // ---------- Preview of the next tap ----------
   function lensTarget(c, tx, ty, up = false) {
@@ -625,7 +800,6 @@
       }
     }
     const end = homing ? { x: target.x, y: target.y } : { x: c.x + tx * tHit, y: c.y + ty * tHit };
-    // first crossing of our own trail along the way
     let cross = null;
     const tr = G.trail;
     const limit = Math.min(tr.length - 3, c.orbitIdx - 2);
@@ -640,25 +814,19 @@
     }
     if (cross) {
       const poly = [cross, ...tr.slice(bestJ + 1), a];
-      const n = G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly)).length;
-      cross = { x: cross.x, y: cross.y, n };
+      cross = { x: cross.x, y: cross.y, n: G.stars.filter((s) => s.type === "star" && !s.used && inside(s, poly)).length };
     }
-    let dustN = 0;
-    const dr = T.dustRadius * S;
-    for (const d of G.dust) {
-      if (d.taken || d.y > Math.max(c.y, end.y) + dr || d.y < Math.min(c.y, end.y) - dr) continue;
-      if (distSeg(d, a, end) < dr) dustN++;
-    }
-    G.preview = { tx, ty, target, end, cross, homing, miss: !target, dust: dustN };
+    const coinsLeft = target ? target.coins.filter((k) => !k.taken).length : 0;
+    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft };
   }
 
-  // ---------- Comet ----------
+  // ---------- Rocket ----------
   function release() {
     const c = G.c;
     if (state !== "play" || c.mode !== "orbit") return;
     G.snap = {
-      c: { ...c }, light: G.light, chain: G.chain, lastHue: G.lastHue, sparkScore: G.sparkScore,
-      totalLight: G.totalLight, level: G.level, nextLevelAt: G.nextLevelAt, jumps: G.jumps, trail: G.trail.slice(), used: [],
+      c: { ...c }, fuel: G.fuel, chain: G.chain, lastHue: G.lastHue, cellScore: G.cellScore,
+      totalFuel: G.totalFuel, level: G.level, nextLevelAt: G.nextLevelAt, jumps: G.jumps, trail: G.trail.slice(), used: [],
     };
     const v = speedNow();
     c.vx = c.dir * -Math.sin(c.ang) * v;
@@ -666,10 +834,9 @@
     c.homing = null;
     if (G.power.jet > 0) c.homing = lensTarget(c, c.vx / v, c.vy / v, true);
     else if (G.lens > 0) { c.homing = lensTarget(c, c.vx / v, c.vy / v); G.lens--; }
-    sfx("release");
     c.mode = "free"; c.ignore = c.star; c.star = null; c.freeT = 0; c.drifting = false;
     G.hintT = Math.min(G.hintT, 0.5);
-    for (let i = 0; i < 8; i++) addPart(c.x, c.y, -c.vx * rand(0.1, 0.4) + rand(-30, 30), -c.vy * rand(0.1, 0.4) + rand(-30, 30), 0.5, 1.6, 195, 90, 80);
+    sfx("release");
   }
 
   function capture(s) {
@@ -690,6 +857,7 @@
     if (state === "play") {
       const before = speedTarget();
       G.jumps++;
+      stat("jumps", G.jumps);
       const after = speedTarget();
       if (after > before) {
         if (before < 1) banner("Warm-up over", "The pace picks up. It rises again every " + T.stepJumps + " jumps.");
@@ -709,15 +877,21 @@
     return b;
   }
 
-  function stepComet(dt) {
+  function stepRocket(dt) {
     const c = G.c;
     const v = speedNow();
     if (c.mode === "orbit") {
       const s = c.star;
+      c.R += (laneR(s) - c.R) * Math.min(1, dt * 4); // settle into the coin lane
       const w = (v / c.R) * c.dir;
       c.ang += w * dt; c.acc += w * dt;
       c.x = s.x + Math.cos(c.ang) * c.R; c.y = s.y + Math.sin(c.ang) * c.R;
       addTrail(c.x, c.y);
+      if (state === "play") {
+        for (const k of s.coins) {
+          if (!k.taken && Math.abs(angDiff(c.ang, k.a)) < T.coinHit) takeCoin(s, k, c.x, c.y);
+        }
+      }
       if (Math.abs(c.acc) >= TAU) {
         c.acc -= Math.sign(c.acc) * TAU;
         G.trail.length = Math.min(G.trail.length, c.orbitIdx + 1);
@@ -738,8 +912,7 @@
             s.cool = 4;
             mistake(T.holeCost, "BLACK HOLE", c);
             c.vx = (-dx / d) * v; c.vy = (-dy / d) * v;
-            G.shake = 0.4;
-          }
+          } else if (!s.shaved && d < s.capR * 0.75 && d > s.capR * 0.4 && state === "play") { s.shaved = true; closeShave(c); }
         } else if (d < s.capR * 1.5 && d > 1) {
           const a = T.bend * v * v / d * (s.capR / d) * (s.capR / d);
           c.vx += (dx / d) * a * dt; c.vy += (dy / d) * a * dt;
@@ -767,40 +940,46 @@
         if (Math.hypot(c.x - s.x, c.y - s.y) < captureR(s)) { capture(s); break; }
       }
     }
-    if (c.mode !== "dark" && Math.random() < 0.7) {
-      const hue = lerp(20, 195, clamp(G.light / 60, 0, 1));
-      addPart(c.x, c.y, rand(-15, 15), rand(-15, 15), rand(0.3, 0.6), rand(0.8, 1.8), hue, 90, 75);
+    if (state !== "dark" && Math.random() < 0.8) {
+      const h = heading();
+      const tx = c.x - Math.cos(h) * 14 * S, ty = c.y - Math.sin(h) * 14 * S;
+      const sk = skin();
+      const hue = sk.trail === "fire" ? rand(10, 40) : sk.trail === "gold" ? 45 : sk.trail === "rainbow" ? (G.t * 120) % 360 : sk.trail === "volt" ? 260 : 195;
+      addPart(tx, ty, -Math.cos(h) * 60 + rand(-20, 20), -Math.sin(h) * 60 + rand(-20, 20), rand(0.25, 0.5), rand(1, 2.2), hue, 95, 70);
     }
   }
-
-  function collect(dt) {
+  function heading() {
     const c = G.c;
-    const mag = G.power.magnet > 0;
-    const R = (mag ? 22 : T.dustRadius) * S;
-    const twin = G.power.twin > 0 ? 2 : 1;
-    for (const d of G.dust) {
-      if (d.taken) continue;
-      const dx = c.x - d.x, dy = c.y - d.y;
-      if (Math.abs(dy) > T.magnetRadius * S + 20) continue;
-      const dist = Math.hypot(dx, dy);
-      if (mag && dist < T.magnetRadius * S) { const k = Math.min(1, (700 * S * dt) / dist); d.x += dx * k; d.y += dy * k; }
-      if (dist < R) {
-        d.taken = true;
-        G.dustCount++;
-        G.sparkScore += T.dustScore * twin;
-        addLight(T.dustLight);
-        addPart(d.x, d.y, rand(-40, 40), rand(-40, 40), 0.35, 1.6, 45, 100, 75);
-        sfx("dust");
+    if (c.mode === "orbit") return Math.atan2(c.dir * Math.cos(c.ang), c.dir * -Math.sin(c.ang));
+    return Math.atan2(c.vy, c.vx);
+  }
+
+  function collectPowers(dt) {
+    const c = G.c;
+    if (G.power.magnet > 0) {
+      const R = T.magnetRadius * S;
+      for (const s of G.stars) {
+        if (!s.coins.length || s === c.star || Math.abs(s.y - c.y) > R + s.capR) continue;
+        const lr = laneR(s);
+        for (const k of s.coins) {
+          if (k.taken) continue;
+          const wx = s.x + Math.cos(k.a) * lr, wy = s.y + Math.sin(k.a) * lr;
+          if (Math.hypot(wx - c.x, wy - c.y) < R) takeCoin(s, k, wx, wy);
+        }
       }
     }
     for (const p of G.pickups) {
       if (p.taken || Math.hypot(c.x - p.x, c.y - p.y) > T.pickupRadius * S) continue;
       p.taken = true;
-      const info = { jet: ["COMET JET", "autopilot · no drain"], magnet: ["MAGNET", "pulls in stardust"], twin: ["2× SCORE", "for " + T.twinTime + "s"], shield: ["SHIELD", "blocks one mistake"] }[p.type];
-      if (p.type === "jet") G.power.jet = T.jetTime;
-      else if (p.type === "magnet") G.power.magnet = T.magnetTime;
-      else if (p.type === "twin") G.power.twin = T.twinTime;
+      const info = {
+        jet: ["COMET JET", "autopilot · no burn"], magnet: ["MAGNET", "pulls in coins"],
+        twin: ["2× SCORE", "for " + upg("twin") + "s"], shield: ["SHIELD", "blocks one mistake"],
+      }[p.type];
+      if (p.type === "jet") G.power.jet = upg("jet");
+      else if (p.type === "magnet") G.power.magnet = upg("magnet");
+      else if (p.type === "twin") G.power.twin = upg("twin");
       else G.power.shield = 1;
+      stat("pickups", G.stats.pickups + 1);
       addText(p.x, p.y - 26, info, PCOL[p.type], 1.5);
       G.rings.push({ x: p.x, y: p.y, r: 10, life: 1, hue: PHUE[p.type] });
       sfx("pickup");
@@ -809,38 +988,34 @@
   const PCOL = { jet: "#ffa45c", magnet: "#6fd6ff", twin: "#ffc861", shield: "#8fe3ff" };
   const PHUE = { jet: 28, magnet: 200, twin: 45, shield: 190 };
   const PTXT = { jet: "JET", magnet: "MAG", twin: "2×", shield: "SHLD" };
+  const PMAX = () => ({ jet: upg("jet"), magnet: upg("magnet"), twin: upg("twin") });
 
   function goDark() {
     sfx("dark");
     state = "dark";
-    G.light = 0;
+    G.fuel = 0;
     G.darkT = 0;
     G.shake = 0.5;
-    const c = G.c;
-    for (let i = 0; i < 70; i++) {
-      const a = rand(0, TAU), v = rand(30, 200) * S;
-      addPart(c.x, c.y, Math.cos(a) * v, Math.sin(a) * v, rand(0.6, 1.6), rand(1.2, 3), 25, 70, 55);
-    }
   }
 
   // ---------- Boosters ----------
   function useBooster(k) {
-    if (state !== "play" || G.boosters[k] <= 0) return;
+    if (state !== "play" || P.boosters[k] <= 0) return;
     const c = G.c;
     if (k === "flare") {
-      if (G.light >= 99) return;
-      addLight(T.flare, false);
+      if (G.fuel >= 99) return;
+      addFuel(T.flare, false);
       G.rings.push({ x: c.x, y: c.y, r: 10, life: 1, hue: 45 });
-      addText(c.x, c.y - 30, ["FLARE", "+" + T.flare + " light"], "#ffc861", 1.2);
+      addText(c.x, c.y - 30, ["FLARE", "+" + T.flare + " fuel"], "#ffc861", 1.2);
     } else if (k === "lens") {
       G.lens += T.lensShots;
-      addText(c.x, c.y - 30, ["GRAVITY LENS", T.lensShots + " guided shots"], "#6fd6ff", 1.2);
+      addText(c.x, c.y - 30, ["LENS", T.lensShots + " guided shots"], "#6fd6ff", 1.2);
     } else if (k === "rewind") {
       const s = G.snap;
       if (!s) return;
       Object.assign(c, s.c);
       for (const st of s.used) st.used = false;
-      Object.assign(G, { light: s.light, chain: s.chain, lastHue: s.lastHue, sparkScore: s.sparkScore, totalLight: s.totalLight, level: s.level, nextLevelAt: s.nextLevelAt, jumps: s.jumps, trail: s.trail });
+      Object.assign(G, { fuel: s.fuel, chain: s.chain, lastHue: s.lastHue, cellScore: s.cellScore, totalFuel: s.totalFuel, level: s.level, nextLevelAt: s.nextLevelAt, jumps: s.jumps, trail: s.trail });
       G.snap = null;
       G.rings.push({ x: c.x, y: c.y, r: 60, life: 1, hue: 220, shrink: true });
       addText(c.x, c.y - 30, ["REWIND"], "#e9ecff", 1.0);
@@ -848,21 +1023,135 @@
       const R = T.novaRadius * S;
       const list = G.stars.filter((s) => s.type === "star" && !s.used && Math.hypot(s.x - c.x, s.y - c.y) < R);
       const r = absorb(list, Math.max(1, list.length));
-      G.bestLasso = Math.max(G.bestLasso, list.length);
       G.trail = [{ x: c.x, y: c.y }];
       c.orbitIdx = 0; c.acc = 0;
       G.rings.push({ x: c.x, y: c.y, r: 10, life: 1, hue: 330, max: R });
       G.shake = 0.6;
-      addText(c.x, c.y - 30, ["SUPERNOVA", list.length + " stars · +" + Math.round(r.light) + " light"], "#ff8fb1", 1.6);
+      addText(c.x, c.y - 30, ["NOVA", list.length + " stars · +" + Math.round(r.fuel) + " fuel"], "#ff8fb1", 1.6);
       for (let i = 0; i < 80; i++) { const a = rand(0, TAU), vv = rand(100, 500) * S; addPart(c.x, c.y, Math.cos(a) * vv, Math.sin(a) * vv, rand(0.5, 1.2), rand(1.5, 3), rand(300, 360), 95, 70); }
     }
-    G.boosters[k]--;
+    P.boosters[k]--;
+    save();
     sfx("boost");
   }
-  ui.tray.addEventListener("click", (e) => {
+  $("tray").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-b]");
     if (b) useBooster(b.dataset.b);
   });
+
+  // ---------- Screens ----------
+  const OVERLAYS = ["home", "help", "hangar", "daily", "over"];
+  let backTo = "home";
+  function show(id) {
+    for (const o of OVERLAYS) $(o).hidden = o !== id;
+    $("tray").hidden = id !== null;
+    if (id === "home") renderHome();
+    if (id === "hangar") renderHangar();
+    const first = id && $(id).querySelector("button.go");
+    if (first) first.focus({ preventScroll: true });
+  }
+  function missionItems(el) {
+    el.innerHTML = "";
+    for (const m of P.missions) {
+      const li = document.createElement("li");
+      if (m.done) li.className = "done";
+      const prog = m.done ? "Done" : `${fmt(Math.min(m.progress, m.target))}/${fmt(m.target)}`;
+      li.innerHTML = `<span class="tick"></span><span></span><span class="prog"></span>`;
+      li.children[1].textContent = mdef(m).text(m.target);
+      li.children[2].textContent = prog;
+      el.appendChild(li);
+    }
+  }
+  function renderHome() {
+    $("h-coins").textContent = fmt(P.coins);
+    $("h-shards").textContent = P.shards;
+    $("h-best").textContent = fmt(P.best);
+    $("h-mult").textContent = "Score ×" + P.mult + (P.pendingNew ? " · new set next run" : "");
+    missionItems($("h-missions"));
+  }
+
+  function rocketSVG(r) {
+    return `<svg viewBox="0 0 40 64" width="32" height="50" aria-hidden="true"><path d="M15 46 Q20 63 25 46Z" fill="#ffb054"/><path d="M12 34 L4 50 L13 46Z M28 34 L36 50 L27 46Z" fill="${r.accent}"/><path d="M20 3 C30 14 31 30 28 46 H12 C9 30 10 14 20 3Z" fill="${r.body}"/><circle cx="20" cy="22" r="5" fill="#0b1030" stroke="${r.accent}" stroke-width="2"/></svg>`;
+  }
+  let shopTab = "rockets";
+  function renderHangar() {
+    $("g-coins").textContent = fmt(P.coins);
+    $("g-shards").textContent = P.shards;
+    document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === shopTab));
+    const shop = $("shop");
+    let html = "";
+    if (shopTab === "rockets") {
+      for (const r of ROCKETS) {
+        const owned = P.owned.includes(r.id);
+        const btn = owned
+          ? (P.rocket === r.id ? `<button class="buy equip" disabled>Flying</button>` : `<button class="buy equip" data-act="equip" data-id="${r.id}">Fly this</button>`)
+          : `<button class="buy" data-act="rocket" data-id="${r.id}" ${P.coins < r.price ? "disabled" : ""}>◉ ${fmt(r.price)}</button>`;
+        html += `<div class="item"><span class="ico">${rocketSVG(r)}</span><span class="txt"><b>${r.name}</b><span>${r.trailName}</span></span>${btn}</div>`;
+      }
+    } else if (shopTab === "upgrades") {
+      for (const k of Object.keys(UPG)) {
+        const u = UPG[k], lv = P.upgrades[k], max = lv >= 5;
+        const pips = Array.from({ length: 5 }, (_, i) => `<i class="${i < lv ? "on" : ""}"></i>`).join("");
+        const now = u.base + u.step * lv, next = now + u.step;
+        const btn = max ? `<button class="buy" disabled>Max</button>` : `<button class="buy" data-act="upg" data-id="${k}" ${P.coins < UPG_PRICE[lv] ? "disabled" : ""}>◉ ${fmt(UPG_PRICE[lv])}</button>`;
+        html += `<div class="item"><span class="ico" style="font-weight:800;color:var(--sun)">${k === "fuel" ? "⛽" : PTXT[k]}</span><span class="txt"><b>${u.name}</b><span>${u.desc}: ${now}${u.unit}${max ? "" : " → " + next + u.unit}</span><span class="pips">${pips}</span></span>${btn}</div>`;
+      }
+    } else {
+      for (const k of Object.keys(BOOST)) {
+        const b = BOOST[k];
+        html += `<div class="item"><span class="ico" style="position:relative">${$("b-" + k).querySelector("svg").outerHTML}</span><span class="txt"><b>${b.name} · you have ${P.boosters[k]}</b><span>${b.desc}</span></span><button class="buy" data-act="boost" data-id="${k}" ${P.coins < b.price ? "disabled" : ""}>◉ ${fmt(b.price)}</button></div>`;
+      }
+    }
+    shop.innerHTML = html;
+  }
+  document.querySelector(".tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tab]");
+    if (b) { shopTab = b.dataset.tab; renderHangar(); }
+  });
+  $("shop").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (!b || b.disabled) return;
+    const id = b.dataset.id, act = b.dataset.act;
+    if (act === "equip") P.rocket = id;
+    else if (act === "rocket") { const r = ROCKETS.find((x) => x.id === id); if (P.coins < r.price) return; P.coins -= r.price; P.owned.push(id); P.rocket = id; }
+    else if (act === "upg") { const lv = P.upgrades[id]; if (lv >= 5 || P.coins < UPG_PRICE[lv]) return; P.coins -= UPG_PRICE[lv]; P.upgrades[id]++; }
+    else if (act === "boost") { const pr = BOOST[id].price; if (P.coins < pr) return; P.coins -= pr; P.boosters[id]++; }
+    save();
+    initAudio(); sfx("buy");
+    renderHangar();
+  });
+
+  // daily reward
+  const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  function dailyPending() { return P.daily.last !== dayKey(new Date()); }
+  function nextStreak() {
+    const y = dayKey(new Date(Date.now() - 864e5));
+    return P.daily.last === y ? (P.daily.streak % 7) + 1 : 1;
+  }
+  function rewardText(r) { return r.shards ? "◆ " + r.shards : "◉ " + fmt(r.coins) + (r.boosters ? " + boosters" : ""); }
+  function renderDaily() {
+    const day = nextStreak();
+    $("d-text").textContent = day === 1 ? "Come back every day for bigger rewards. Miss a day and the streak starts over." : `Day ${day} of your streak. Keep it going.`;
+    $("days").innerHTML = DAILY.map((r, i) => `<div class="day ${i + 1 < day ? "got" : ""} ${i + 1 === day ? "today" : ""}"><span>Day ${i + 1}</span><b>${rewardText(r)}</b></div>`).join("");
+  }
+  $("claim").addEventListener("click", () => {
+    const day = nextStreak();
+    const r = DAILY[day - 1];
+    P.coins += r.coins || 0;
+    P.shards += r.shards || 0;
+    if (r.boosters) for (const k in P.boosters) P.boosters[k] += r.boosters;
+    P.daily = { last: dayKey(new Date()), streak: day };
+    save();
+    initAudio(); sfx("buy");
+    show("home");
+  });
+
+  $("open-hangar").addEventListener("click", () => { backTo = "home"; show("hangar"); });
+  $("over-hangar").addEventListener("click", () => { backTo = "over-done"; show("hangar"); });
+  $("close-hangar").addEventListener("click", () => show(backTo === "over-done" ? "home" : backTo));
+  $("open-help").addEventListener("click", () => show("help"));
+  $("close-help").addEventListener("click", () => show("home"));
+  $("over-home").addEventListener("click", () => { state = "menu"; newGame(); show("home"); });
 
   // ---------- Input ----------
   cv.addEventListener("pointerdown", (e) => { initAudio(); if (state === "play") { release(); e.preventDefault(); } });
@@ -877,68 +1166,67 @@
     initAudio();
     newGame();
     state = "play";
-    ui.title.hidden = true; ui.over.hidden = true;
+    show(null);
+    $("tray").hidden = false;
   }
   $("start").addEventListener("click", begin);
   $("restart").addEventListener("click", begin);
   $("revive").addEventListener("click", () => {
-    if (G.revived) return;
+    if (G.revived || P.shards < 1) return;
+    P.shards -= 1; save();
     G.revived = true;
-    G.light = T.revive;
+    G.fuel = T.revive;
+    G.hungry = 0;
     state = "play";
-    ui.over.hidden = true;
+    show(null);
+    $("tray").hidden = false;
     G.rings.push({ x: G.c.x, y: G.c.y, r: 10, life: 1, hue: 45 });
-    addText(G.c.x, G.c.y - 30, ["SECOND WIND"], "#ffc861", 1.4);
+    addText(G.c.x, G.c.y - 30, ["SECOND WIND"], "#8cffb4", 1.4);
   });
 
   // ---------- Update ----------
   const SECTORS = {
-    2: ["Sector 2 · Red dwarfs", "Red stars hold no sparks and drain you while you orbit."],
-    3: ["Sector 3 · Black holes", "They bend your path. Touch the core and you lose Light."],
+    2: ["Sector 2 · Red dwarfs", "Red stars hold no fuel and drain you while you orbit."],
+    3: ["Sector 3 · Black holes", "They bend your path. Touch the core and you lose fuel."],
     4: ["Sector 4 · Clusters", "Same-colour stars bunch together. Chain and lasso them."],
   };
   function update(dt) {
     const c = G.c;
     G.speedCur += (speedTarget() - G.speedCur) * Math.min(1, dt * 0.8);
-    if (state === "play" || state === "title") {
+    if (state === "play" || state === "menu") {
       G.t += dt;
       G.hintT -= dt;
-      for (let i = 0; i < 3; i++) stepComet(dt / 3);
+      for (let i = 0; i < 3; i++) stepRocket(dt / 3);
     }
     if (state === "play") {
       let drain = drainNow();
       if (c.mode === "free" && c.drifting) drain += T.driftDrain;
       if (c.mode === "orbit" && c.star.type === "dwarf") drain += T.dwarfDrain;
       if (G.power.jet > 0) drain = 0;
-      G.light -= drain * dt;
-      if (G.light <= 0) goDark();
+      G.fuel -= drain * dt;
+      if (G.fuel <= 0) goDark();
       for (const k of ["jet", "magnet", "twin"]) G.power[k] = Math.max(0, G.power[k] - dt);
       G.hungry = Math.max(0, G.hungry - dt);
       G.shaveCd = Math.max(0, G.shaveCd - dt);
-      collect(dt);
+      collectPowers(dt);
       if (G.power.jet > 0 && c.mode === "orbit") {
         const tx = c.dir * -Math.sin(c.ang), ty = c.dir * Math.cos(c.ang);
         if (lensTarget(c, tx, ty, true)) release();
-      }
-      // black-hole close shaves
-      if (c.mode === "free") for (const s of G.stars) {
-        if (s.type !== "hole" || s.shaved) continue;
-        const d = Math.hypot(s.x - c.x, s.y - c.y);
-        if (d < s.capR * 0.75 && d > s.capR * 0.4) { s.shaved = true; closeShave(c); }
       }
       G.maxClimb = Math.max(G.maxClimb, G.startY - c.y);
       const sec = 1 + Math.floor(G.maxClimb / (T.sectorLen * S));
       if (sec > G.sector) {
         G.sector = sec;
-        const b = SECTORS[sec] || [`Sector ${sec} · Deep space`, "Everything, more often. Light burns faster."];
+        stat("sector", sec);
+        const b = SECTORS[sec] || [`Sector ${sec} · Deep space`, "Everything, more often. Fuel burns faster."];
         banner(b[0], b[1]);
       }
-      G.score = Math.floor(G.maxClimb / 10) + G.sparkScore;
+      G.score = Math.floor((G.maxClimb / 10 + G.cellScore) * G.mult);
+      stat("score", G.score);
     } else if (state === "dark") {
       G.darkT += dt;
-      if (G.darkT > 1.4) showGameOver();
+      if (G.darkT > 1.6) showGameOver();
     }
-    // camera follows the comet both ways
     const target = c.y - H * 0.58;
     G.camTop += (target - G.camTop) * Math.min(1, dt * 2.2);
     ensureStars();
@@ -949,8 +1237,9 @@
 
     computePreview();
     G.lunge = Math.max(0, G.lunge - dt * 1.6);
-    const gapTarget = state === "dark" || state === "over" ? -60 : 10 + (H * 0.42 + 50) * Math.pow(clamp(G.light / 100, 0, 1), 0.85);
-    G.devGap += (gapTarget - G.devGap) * Math.min(1, dt * (state === "dark" ? 4 : 2.5));
+    const gapTarget = state === "dark" || state === "over" ? 0 : 10 + (H * 0.42 + 70) * Math.pow(clamp(G.fuel / 100, 0, 1), 0.85);
+    G.devGap += (gapTarget - G.devGap) * Math.min(1, dt * (state === "dark" ? 3 : 2.5));
+    G.shipX += (c.x - G.shipX) * Math.min(1, dt * 1.4);
     for (const p of G.pickups) p.bob += dt * 2.5;
     G.shake = Math.max(0, G.shake - dt);
     if (G.banner) { G.banner.life -= dt; if (G.banner.life <= 0) G.banner = null; }
@@ -978,25 +1267,24 @@
 
   function showGameOver() {
     state = "over";
-    if (G.score > best) { best = G.score; try { localStorage.setItem("wake.v2.best", String(best)); } catch (e) {} }
+    const earned = G.coinsRun - G.coinsBanked;
+    P.coins += earned;
+    G.coinsBanked = G.coinsRun;
+    if (G.score > P.best) P.best = G.score;
+    save();
     $("r-score").textContent = fmt(G.score);
-    $("r-best").textContent = fmt(best);
+    $("r-best").textContent = fmt(P.best);
+    $("r-coins").textContent = "◉ " + fmt(G.coinsRun);
     $("r-dist").textContent = fmt(G.maxClimb / 10);
-    $("r-chain").textContent = "×" + G.bestChain;
-    $("r-dust").textContent = fmt(G.dustCount);
-    try { localStorage.setItem("wake.dust.bank", String((Number(localStorage.getItem("wake.dust.bank")) || 0) + G.dustCount)); } catch (e) {}
+    $("r-chain").textContent = "×" + G.stats.chain;
     $("r-sector").textContent = G.sector;
-    const tips = [
-      "Same colour, same colour, same colour. A ×4 chain refuels you twice as fast.",
-      "Grey stars are used up. Landing there buys time but no Light.",
-      "Look for loops: the preview turns gold when a crossing would lasso stars.",
-      "Save Rewind for the shot that sends you drifting.",
-      "Supernova is strongest in a crowd of unused stars.",
-    ];
-    $("r-tip").textContent = tips[(Math.random() * tips.length) | 0];
-    $("revive").hidden = G.revived;
-    ui.over.hidden = false;
-    (G.revived ? $("restart") : $("revive")).focus();
+    $("r-mult").textContent = "Score ×" + P.mult;
+    missionItems($("r-missions"));
+    const rv = $("revive");
+    rv.hidden = G.revived;
+    rv.disabled = P.shards < 1;
+    rv.textContent = P.shards < 1 ? "No ◆ shards left" : "Second Wind · ◆ 1";
+    show("over");
   }
 
   // ---------- Render ----------
@@ -1015,8 +1303,7 @@
       return;
     }
     ctx.beginPath(); ctx.arc(s.x, s.y, cr, 0, TAU);
-    const ringHue = s.used ? 230 : s.hue;
-    ctx.strokeStyle = `hsla(${ringHue}, ${s.used ? 15 : 80}%, 72%, ${active ? 0.45 : s.used ? 0.12 : 0.26})`;
+    ctx.strokeStyle = `hsla(${s.used ? 230 : s.hue}, ${s.used ? 15 : 80}%, 72%, ${active ? 0.4 : s.used ? 0.1 : 0.22})`;
     ctx.lineWidth = 1.2; ctx.setLineDash([3, 6]); ctx.stroke(); ctx.setLineDash([]);
     const glowR = s.core * (s.type === "dwarf" ? 6 : 4.5) * tw;
     const sat = s.used ? 10 : s.type === "dwarf" ? 95 : 90;
@@ -1027,118 +1314,191 @@
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, glowR, 0, TAU); ctx.fill();
     ctx.fillStyle = s.used ? "#5d6380" : s.type === "dwarf" ? "#ff9a8a" : `hsl(${s.hue}, 100%, 88%)`;
     ctx.beginPath(); ctx.arc(s.x, s.y, s.core * (s.type === "dwarf" ? 1.4 : 1) * tw, 0, TAU); ctx.fill();
-    // sparks
-    if (!s.used && s.sparks) {
-      for (let k = 0; k < s.sparks; k++) {
-        const a = G.t * 1.2 + s.tw + (k * TAU) / s.sparks;
-        const rr = s.core * 2.6;
+    if (!s.used && s.cells) {
+      for (let k = 0; k < s.cells; k++) {
+        const a = G.t * 1.2 + s.tw + (k * TAU) / s.cells;
         ctx.fillStyle = `hsl(${s.hue}, 100%, 85%)`;
-        ctx.beginPath(); ctx.arc(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr, 2.6 * S, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(s.x + Math.cos(a) * s.core * 2.6, s.y + Math.sin(a) * s.core * 2.6, 2.6 * S, 0, TAU); ctx.fill();
+      }
+    }
+    // coin arc on the orbit lane
+    if (s.coins.length) {
+      const lr = laneR(s);
+      for (const k of s.coins) {
+        if (k.taken) continue;
+        const x = s.x + Math.cos(k.a) * lr, y = s.y + Math.sin(k.a) * lr;
+        const spin = Math.abs(Math.cos(G.t * 3 + k.a * 2));
+        ctx.fillStyle = "#b8862b";
+        ctx.beginPath(); ctx.ellipse(x, y, 4.6 * S * (0.35 + 0.65 * spin), 4.6 * S, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = "#ffd36b";
+        ctx.beginPath(); ctx.ellipse(x, y, 3.4 * S * (0.35 + 0.65 * spin), 3.4 * S, 0, 0, TAU); ctx.fill();
       }
     }
   }
 
   function drawPreview() {
-    const P = G.preview, c = G.c;
-    if (!P || state !== "play") return;
-    const col = P.miss ? "rgba(255, 122, 154, 0.75)" : "rgba(233, 236, 255, 0.55)";
-    ctx.setLineDash([2, 7]); ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+    const P2 = G.preview, c = G.c;
+    if (!P2 || state !== "play") return;
+    ctx.setLineDash([2, 7]);
+    ctx.strokeStyle = P2.miss ? "rgba(255, 122, 154, 0.75)" : "rgba(233, 236, 255, 0.55)";
+    ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.moveTo(c.x, c.y);
-    if (P.homing) ctx.quadraticCurveTo(c.x + P.tx * 80 * S, c.y + P.ty * 80 * S, P.end.x, P.end.y);
-    else ctx.lineTo(P.end.x, P.end.y);
+    if (P2.homing) ctx.quadraticCurveTo(c.x + P2.tx * 80 * S, c.y + P2.ty * 80 * S, P2.end.x, P2.end.y);
+    else ctx.lineTo(P2.end.x, P2.end.y);
     ctx.stroke(); ctx.setLineDash([]);
-
     ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    if (P.cross) {
-      const good = P.cross.n > 0;
+    if (P2.cross) {
+      const good = P2.cross.n > 0;
       ctx.strokeStyle = good ? "#ffc861" : "#ff7a9a"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(P.cross.x, P.cross.y, 7, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(P2.cross.x, P2.cross.y, 7, 0, TAU); ctx.stroke();
       ctx.font = `800 ${Math.round(12 * S)}px Manrope, sans-serif`;
       ctx.fillStyle = good ? "#ffc861" : "#ff7a9a";
-      ctx.fillText(good ? `LASSO ×${P.cross.n}` : `SNAG −${T.snagCost}`, P.cross.x, P.cross.y - 10);
+      ctx.fillText(good ? `LASSO ×${P2.cross.n}` : `SNAG −${T.snagCost}`, P2.cross.x, P2.cross.y - 10);
     }
-    if (P.miss) {
+    if (P2.miss) {
       ctx.font = `800 ${Math.round(12 * S)}px Manrope, sans-serif`;
       ctx.fillStyle = "#ff7a9a";
-      ctx.fillText("MISS · drift" + (P.dust ? ` · ✦${P.dust}` : ""), P.end.x, P.end.y - 6);
+      ctx.fillText("MISS · drift", P2.end.x, P2.end.y - 6);
       return;
     }
-    const s = P.target;
-    const cr = captureR(s);
-    ctx.strokeStyle = P.homing ? "rgba(111, 214, 255, 0.9)" : "rgba(233, 236, 255, 0.55)";
+    const s = P2.target, cr = captureR(s);
+    ctx.strokeStyle = P2.homing ? "rgba(111, 214, 255, 0.9)" : "rgba(233, 236, 255, 0.55)";
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(s.x, s.y, cr, 0, TAU); ctx.stroke();
     let label, color;
     if (s.type === "dwarf") { label = "DRAINS"; color = "#ff7a9a"; }
     else if (s.used) { label = "EMPTY"; color = "#9aa2c8"; }
     else {
-      const same = s.hue === G.lastHue;
-      const ch = same ? Math.min(T.chainMax, G.chain + 1) : 1;
-      const gain = Math.round(s.sparks * T.sparkLight * (1 + T.chainLightStep * (ch - 1)));
-      label = `+${gain} light` + (ch > 1 ? ` · ×${ch}` : G.chain > 1 ? " · resets chain" : "");
-    }
-    if (P.dust) label += ` · ✦${P.dust}`;
-    {
+      const ch = s.hue === G.lastHue ? Math.min(T.chainMax, G.chain + 1) : 1;
+      const gain = Math.round(s.cells * T.cellFuel * (1 + T.chainFuelStep * (ch - 1)));
+      label = `+${gain} fuel` + (ch > 1 ? ` · ×${ch}` : G.chain > 1 ? " · resets chain" : "");
       color = `hsl(${s.hue}, 95%, 78%)`;
     }
+    if (P2.coins) label += ` · ◉${P2.coins}`;
     ctx.font = `800 ${Math.round(13 * S)}px Manrope, sans-serif`;
     const lw = ctx.measureText(label).width + 14;
     const ly = s.y - cr - 8;
-    ctx.fillStyle = "rgba(7, 9, 19, 0.75)";
+    ctx.fillStyle = "rgba(7, 9, 19, 0.78)";
     ctx.fillRect(s.x - lw / 2, ly - 18 * S, lw, 20 * S);
     ctx.fillStyle = color;
     ctx.fillText(label, s.x, ly);
   }
 
-  function drawDevourer() {
-    const c = G.c;
-    const cx = colL + c.x, cy = c.y - G.camTop;
-    const top = cy + G.devGap - G.lunge * 70 * S;
-    if (top > H + 20) return;
-    const t = G.t;
-    const near = clamp(1 - G.devGap / (H * 0.42), 0, 1);
-    ctx.beginPath();
-    ctx.moveTo(0, H + 10);
-    for (let x = 0; x <= W + 12; x += 12) {
-      const reach = Math.exp(-((x - cx) ** 2) / (2 * (70 * S) ** 2)) * (20 + near * 50 + G.lunge * 40) * S;
-      const y = top + Math.sin(x * 0.03 + t * 2.2) * 10 + Math.sin(x * 0.011 - t * 1.3) * 16 - reach + 30;
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(W, H + 10);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(0, top, 0, Math.min(H, top + 260));
-    g.addColorStop(0, "rgba(40, 6, 46, 0.92)"); g.addColorStop(0.4, "rgba(14, 2, 18, 0.97)"); g.addColorStop(1, "rgba(3, 0, 5, 1)");
-    ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = `rgba(${180 + near * 70}, 40, 110, ${0.5 + near * 0.4})`; ctx.lineWidth = 2.5; ctx.stroke();
-    // eyes
-    const ey = top + 70 * S;
-    if (ey < H + 10) {
-      const open = clamp(0.25 + near * 0.9 + G.lunge, 0, 1) * (Math.sin(t * 0.9) > 0.97 ? 0.1 : 1);
-      for (const side of [-1, 1]) {
-        const ex = cx + side * 34 * S;
-        const eg = ctx.createRadialGradient(ex, ey, 0, ex, ey, 26 * S);
-        eg.addColorStop(0, `rgba(255, 60, 90, ${0.6 * open})`); eg.addColorStop(1, "rgba(255, 60, 90, 0)");
-        ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(ex, ey, 26 * S, 0, TAU); ctx.fill();
-        ctx.fillStyle = `rgba(255, 210, 220, ${open})`;
-        ctx.beginPath(); ctx.ellipse(ex, ey, 9 * S, Math.max(0.8, 6 * S * open), side * 0.25, 0, TAU); ctx.fill();
+  const hash = (i) => { const x = Math.sin(i * 127.1) * 43758.5453; return x - Math.floor(x); };
+  function drawTrail() {
+    const tr = G.trail, c = G.c;
+    if (tr.length < 2) return;
+    const style = skin().trail;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const path = () => { ctx.beginPath(); ctx.moveTo(tr[0].x, tr[0].y); for (let i = 1; i < tr.length; i++) ctx.lineTo(tr[i].x, tr[i].y); ctx.lineTo(c.x, c.y); };
+    const glow = { ice: "rgba(111, 214, 255, 0.15)", fire: "rgba(255, 110, 40, 0.2)", gold: "rgba(255, 200, 97, 0.18)", volt: "rgba(185, 167, 255, 0.2)", rainbow: "rgba(255, 255, 255, 0.08)" }[style];
+    path(); ctx.strokeStyle = glow; ctx.lineWidth = 9; ctx.stroke();
+    if (style === "rainbow") {
+      for (let i = 0; i < tr.length - 1; i += 10) {
+        ctx.beginPath(); ctx.moveTo(tr[i].x, tr[i].y);
+        for (let k = i + 1; k <= Math.min(i + 10, tr.length - 1); k++) ctx.lineTo(tr[k].x, tr[k].y);
+        ctx.strokeStyle = `hsla(${(i * 3 + G.t * 60) % 360}, 90%, 70%, 0.9)`; ctx.lineWidth = 2.4; ctx.stroke();
       }
+      return;
+    }
+    if (style === "volt") {
+      ctx.beginPath(); ctx.moveTo(tr[0].x, tr[0].y);
+      for (let i = 1; i < tr.length; i++) {
+        const a = tr[i - 1], b = tr[i];
+        const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
+        const j = (hash(i + Math.floor(G.t * 8)) - 0.5) * 6;
+        ctx.lineTo(b.x - (dy / l) * j, b.y + (dx / l) * j);
+      }
+      ctx.strokeStyle = "rgba(225, 215, 255, 0.92)"; ctx.lineWidth = 1.6; ctx.stroke();
+      return;
+    }
+    path();
+    ctx.strokeStyle = { ice: "rgba(160, 228, 255, 0.85)", fire: "rgba(255, 190, 110, 0.9)", gold: "rgba(255, 226, 150, 0.95)" }[style];
+    ctx.lineWidth = 2.2; ctx.stroke();
+  }
+
+  function drawRocket(x, y, ang, k, sk, alpha = 1) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang); ctx.scale(k, k);
+    ctx.globalAlpha = alpha;
+    const fl = 7 + Math.random() * 7 + (G.power.jet > 0 ? 8 : 0);
+    ctx.fillStyle = "rgba(255, 150, 60, 0.85)";
+    ctx.beginPath(); ctx.moveTo(-11, -4); ctx.quadraticCurveTo(-13 - fl, 0, -11, 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255, 236, 160, 0.95)";
+    ctx.beginPath(); ctx.moveTo(-11, -2.2); ctx.quadraticCurveTo(-12 - fl * 0.55, 0, -11, 2.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = sk.accent;
+    ctx.beginPath(); ctx.moveTo(-6, -5); ctx.lineTo(-14, -11); ctx.lineTo(-11, -4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-6, 5); ctx.lineTo(-14, 11); ctx.lineTo(-11, 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = sk.body;
+    ctx.beginPath(); ctx.moveTo(-11, -5.5); ctx.lineTo(4, -5.5); ctx.quadraticCurveTo(14, -4.5, 17, 0); ctx.quadraticCurveTo(14, 4.5, 4, 5.5); ctx.lineTo(-11, 5.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#0b1030"; ctx.strokeStyle = sk.accent; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(3, 0, 2.6, 0, TAU); ctx.fill(); ctx.stroke();
+    if (G.power.shield > 0) {
+      ctx.strokeStyle = "rgba(143, 227, 255, 0.7)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(2, 0, 19, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawAlienShip() {
+    const c = G.c;
+    const rx = colL + c.x, ry = c.y - G.camTop;
+    const near = clamp(1 - G.devGap / (H * 0.42), 0, 1);
+    const sx = colL + G.shipX, sy = ry + G.devGap + 40 * S - G.lunge * 70 * S;
+    if (sy > H + 60) return;
+    const t = G.t;
+    // tractor beam
+    if (near > 0.35 || G.lunge > 0.2 || state === "dark") {
+      const a = clamp(Math.max(near - 0.35, G.lunge * 0.6, state === "dark" ? 0.8 : 0), 0, 0.8);
+      const bg = ctx.createLinearGradient(0, sy, 0, ry);
+      bg.addColorStop(0, `rgba(140, 255, 180, ${0.45 * a})`); bg.addColorStop(1, `rgba(140, 255, 180, ${0.05 * a})`);
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.moveTo(sx - 18 * S, sy - 10 * S); ctx.lineTo(rx - 30 * S, ry); ctx.lineTo(rx + 30 * S, ry); ctx.lineTo(sx + 18 * S, sy - 10 * S); ctx.closePath(); ctx.fill();
+    }
+    // underglow
+    const ug = ctx.createRadialGradient(sx, sy + 6 * S, 0, sx, sy + 6 * S, 90 * S);
+    ug.addColorStop(0, `rgba(140, 255, 180, ${0.25 + near * 0.2})`); ug.addColorStop(1, "rgba(140, 255, 180, 0)");
+    ctx.fillStyle = ug; ctx.beginPath(); ctx.arc(sx, sy + 6 * S, 90 * S, 0, TAU); ctx.fill();
+    // dome with pilot
+    ctx.fillStyle = "rgba(150, 230, 255, 0.35)";
+    ctx.beginPath(); ctx.ellipse(sx, sy - 8 * S, 24 * S, 20 * S, 0, Math.PI, TAU); ctx.fill();
+    ctx.fillStyle = "#7dff9e";
+    ctx.beginPath(); ctx.ellipse(sx, sy - 12 * S, 8 * S, 9 * S, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#0b1030";
+    const look = clamp((rx - sx) / 200, -1, 1) * 2 * S;
+    ctx.beginPath(); ctx.ellipse(sx - 3.2 * S + look, sy - 14 * S, 2.2 * S, 3.4 * S, -0.4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + 3.2 * S + look, sy - 14 * S, 2.2 * S, 3.4 * S, 0.4, 0, TAU); ctx.fill();
+    // saucer body
+    const body = ctx.createLinearGradient(0, sy - 10 * S, 0, sy + 12 * S);
+    body.addColorStop(0, "#c9d1ee"); body.addColorStop(0.5, "#7a84ad"); body.addColorStop(1, "#2f3658");
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(sx, sy, 62 * S, 15 * S, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(sx, sy - 2 * S, 56 * S, 9 * S, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+    // running lights
+    for (let i = 0; i < 7; i++) {
+      const lx = sx + (i - 3) * 15 * S, ly = sy + 6 * S - Math.abs(i - 3) * 1.6 * S;
+      const on = Math.sin(t * 8 - i * 0.9) > 0;
+      ctx.fillStyle = on ? (near > 0.6 ? "#ff5b7a" : "#8cffb4") : "rgba(255,255,255,0.25)";
+      ctx.beginPath(); ctx.arc(lx, ly, 2.4 * S, 0, TAU); ctx.fill();
     }
   }
 
   function drawPowers() {
     if (state !== "play") return;
     const items = [];
-    if (G.power.jet > 0) items.push(["jet", G.power.jet / T.jetTime]);
-    if (G.power.magnet > 0) items.push(["magnet", G.power.magnet / T.magnetTime]);
-    if (G.power.twin > 0) items.push(["twin", G.power.twin / T.twinTime]);
+    const mx = PMAX();
+    if (G.power.jet > 0) items.push(["jet", G.power.jet / mx.jet]);
+    if (G.power.magnet > 0) items.push(["magnet", G.power.magnet / mx.magnet]);
+    if (G.power.twin > 0) items.push(["twin", G.power.twin / mx.twin]);
     if (G.power.shield > 0) items.push(["shield", 1]);
     if (G.hungry > 0) items.push(["hungry", G.hungry / T.hungryTime]);
     let x = 16;
     const y = 96;
     ctx.font = `800 11px Manrope, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     for (const [k, f] of items) {
-      const label = k === "hungry" ? "HUNGRY" : PTXT[k];
-      const col = k === "hungry" ? "#ff4f7a" : PCOL[k];
+      const label = k === "hungry" ? "BEAM READY" : PTXT[k];
+      const col = k === "hungry" ? "#8cffb4" : PCOL[k];
       const w = ctx.measureText(label).width + 18;
       ctx.fillStyle = "rgba(16, 20, 42, 0.85)"; ctx.fillRect(x, y - 11, w, 22);
       ctx.fillStyle = col; ctx.fillRect(x, y + 9, w * f, 2);
@@ -1163,7 +1523,6 @@
     ctx.save();
     const sh = G.shake * 10 * (reduceMotion ? 0.3 : 1);
     ctx.translate(colL + rand(-sh, sh), -G.camTop + rand(-sh, sh));
-
     for (const f of G.flashes) {
       ctx.beginPath();
       f.poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
@@ -1171,28 +1530,13 @@
       ctx.fillStyle = `rgba(255, 200, 97, ${0.28 * f.life})`; ctx.fill();
       ctx.strokeStyle = `rgba(255, 220, 150, ${f.life})`; ctx.lineWidth = 3; ctx.stroke();
     }
-
     for (const s of G.stars) {
       if (s.y < G.camTop - s.capR * 2 || s.y > G.camTop + H + s.capR * 2) continue;
       drawStar(s);
     }
-
-    // stardust
-    ctx.globalCompositeOperation = "lighter";
-    for (const d of G.dust) {
-      if (d.taken || d.y < G.camTop - 10 || d.y > G.camTop + H + 10) continue;
-      const tw = 0.6 + 0.4 * Math.sin(G.t * 5 + d.ph);
-      ctx.fillStyle = `rgba(255, 200, 97, ${0.18 * tw})`;
-      ctx.beginPath(); ctx.arc(d.x, d.y, 5 * S, 0, TAU); ctx.fill();
-      ctx.fillStyle = `rgba(255, 236, 190, ${0.9 * tw})`;
-      ctx.beginPath(); ctx.arc(d.x, d.y, 1.8 * S, 0, TAU); ctx.fill();
-    }
-    ctx.globalCompositeOperation = "source-over";
-    // pickups
     for (const p of G.pickups) {
       if (p.taken || p.y < G.camTop - 30 || p.y > G.camTop + H + 30) continue;
-      const y = p.y + Math.sin(p.bob) * 4;
-      const R = 15 * S;
+      const y = p.y + Math.sin(p.bob) * 4, R = 15 * S;
       const g = ctx.createRadialGradient(p.x, y, 0, p.x, y, R * 2);
       g.addColorStop(0, `hsla(${PHUE[p.type]}, 100%, 70%, 0.45)`); g.addColorStop(1, `hsla(${PHUE[p.type]}, 100%, 60%, 0)`);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, R * 2, 0, TAU); ctx.fill();
@@ -1203,43 +1547,28 @@
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(PTXT[p.type], p.x, y + 0.5);
     }
-
-    const tr = G.trail;
-    if (tr.length > 1) {
-      ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.beginPath(); ctx.moveTo(tr[0].x, tr[0].y);
-      for (let i = 1; i < tr.length; i++) ctx.lineTo(tr[i].x, tr[i].y);
-      ctx.lineTo(c.x, c.y);
-      ctx.strokeStyle = "rgba(111, 214, 255, 0.15)"; ctx.lineWidth = 8; ctx.stroke();
-      ctx.strokeStyle = "rgba(160, 228, 255, 0.85)"; ctx.lineWidth = 2; ctx.stroke();
+    drawTrail();
+    if (G.power.magnet > 0 && state === "play") {
+      ctx.strokeStyle = `rgba(111, 214, 255, ${0.15 + 0.1 * Math.sin(G.t * 6)})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(c.x, c.y, T.magnetRadius * S, 0, TAU); ctx.stroke();
     }
-
     drawPreview();
-
     for (const r of G.rings) {
       ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(1, r.r), 0, TAU);
       ctx.strokeStyle = `hsla(${r.hue}, 100%, 75%, ${r.life})`; ctx.lineWidth = 3; ctx.stroke();
     }
-
     ctx.globalCompositeOperation = "lighter";
     for (const p of G.parts) {
       ctx.fillStyle = `hsla(${p.hue}, ${p.sat}%, ${p.light}%, ${p.life / p.max})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
     }
-    if (state !== "dark" && state !== "over") {
-      const lt = clamp(G.light / 60, 0, 1);
-      const hue = lerp(20, 195, lt);
-      const R = (13 + G.level * 0.8) * S * (0.7 + 0.3 * lt);
-      const hg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, R);
-      hg.addColorStop(0, "rgba(255,255,255,1)"); hg.addColorStop(0.3, `hsla(${hue}, 90%, 75%, 0.65)`); hg.addColorStop(1, `hsla(${hue}, 90%, 65%, 0)`);
-      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, TAU); ctx.fill();
-    } else {
-      const a = Math.max(0, 1 - G.darkT);
-      ctx.fillStyle = `rgba(255, 150, 90, ${a})`;
-      ctx.beginPath(); ctx.arc(c.x, c.y, 4 * S, 0, TAU); ctx.fill();
-    }
     ctx.globalCompositeOperation = "source-over";
-
+    if (state === "dark" || state === "over") {
+      const k = Math.max(0, 1 - G.darkT * 0.7);
+      if (k > 0) drawRocket(c.x, c.y + G.darkT * 30 * S, heading() + G.darkT * 4, 1.15 * S * k, skin(), k);
+    } else {
+      drawRocket(c.x, c.y, heading(), 1.15 * S, skin());
+    }
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     for (const t of G.texts) {
       ctx.globalAlpha = clamp((t.life / t.max) * 1.6, 0, 1);
@@ -1252,64 +1581,62 @@
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    drawDevourer();
+    drawAlienShip();
     drawPowers();
 
-    // low Light vignette
-    if (state === "play" && G.light < 25) {
-      const k = (1 - G.light / 25) * (0.5 + 0.5 * Math.sin(G.t * 6));
+    if (state === "play" && G.fuel < 25) {
+      const k = (1 - G.fuel / 25) * (0.5 + 0.5 * Math.sin(G.t * 6));
       const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-      vg.addColorStop(0, "rgba(255, 79, 122, 0)"); vg.addColorStop(1, `rgba(255, 79, 122, ${0.35 * k})`);
+      vg.addColorStop(0, "rgba(140, 255, 180, 0)"); vg.addColorStop(1, `rgba(140, 255, 180, ${0.22 * k})`);
       ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
     }
-
     if (G.banner && state === "play") {
       const b = G.banner;
       ctx.globalAlpha = clamp(Math.min(b.life, b.max - b.life) * 2, 0, 1);
-      const y = H * 0.24;
-      ctx.fillStyle = "rgba(16, 20, 42, 0.85)";
-      const bw = Math.min(W - 32, 420);
+      const y = H * 0.24, bw = Math.min(W - 32, 440);
+      ctx.fillStyle = "rgba(16, 20, 42, 0.88)";
       ctx.fillRect(W / 2 - bw / 2, y - 30, bw, 58);
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillStyle = "#ffc861"; ctx.font = `800 ${Math.round(17 * S)}px Manrope, sans-serif`;
-      ctx.fillText(b.title, W / 2, y - 10);
-      ctx.fillStyle = "#e9ecff"; ctx.font = `600 ${Math.round(12.5 * S)}px Manrope, sans-serif`;
+      ctx.fillStyle = "#ffc861"; ctx.font = `800 ${Math.round(16 * S)}px Manrope, sans-serif`;
+      ctx.fillText(b.title, W / 2, y - 10, bw - 20);
+      ctx.fillStyle = "#e9ecff"; ctx.font = `600 ${Math.round(12 * S)}px Manrope, sans-serif`;
       ctx.fillText(b.sub, W / 2, y + 13, bw - 20);
       ctx.globalAlpha = 1;
     }
-
     if (state === "play" && G.hintT > 0 && !G.banner) {
       ctx.globalAlpha = clamp(G.hintT, 0, 1) * 0.9;
       ctx.fillStyle = "#e9ecff";
       ctx.font = `600 ${Math.round(14.5 * S)}px Manrope, sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText("Tap when the preview shows what you want.", W / 2, H * 0.2);
-      ctx.fillText("Same colour builds your chain. Grab the ✦ dust.", W / 2, H * 0.2 + 22 * S);
+      ctx.fillText("Tap when the label shows what you want.", W / 2, H * 0.2);
+      ctx.fillText("Circle longer for coins, but fuel burns.", W / 2, H * 0.2 + 22 * S);
       ctx.globalAlpha = 1;
     }
   }
 
   function updateHud() {
-    ui.score.textContent = fmt(G.score);
-    $("dust").textContent = "✦ " + fmt(G.dustCount);
-    const l = clamp(G.light, 0, 100);
-    ui.lightbar.style.width = l + "%";
-    ui.meter.classList.toggle("low", l < 25);
-    ui.lv.textContent = "LV " + G.level;
+    $("score").textContent = fmt(G.score);
+    $("mult").textContent = "×" + G.mult;
+    $("coins").textContent = "◉ " + fmt(G.coinsRun);
+    const l = clamp(G.fuel, 0, 100);
+    $("fuelbar").style.width = l + "%";
+    $("meter").classList.toggle("low", l < 25);
+    $("lv").textContent = "LV " + G.level;
     const prev = G.nextLevelAt - (T.levelBase + T.levelStep * (G.level - 1));
-    ui.xpbar.style.width = clamp(((G.totalLight - prev) / (G.nextLevelAt - prev)) * 100, 0, 100) + "%";
-    ui.chain.textContent = "×" + G.chain;
-    ui.chaindot.style.background = G.lastHue == null ? "#9aa2c8" : `hsl(${G.lastHue}, 90%, 70%)`;
+    $("xpbar").style.width = clamp(((G.totalFuel - prev) / (G.nextLevelAt - prev)) * 100, 0, 100) + "%";
+    $("chain").textContent = "×" + G.chain;
+    $("chaindot").style.background = G.lastHue == null ? "#9aa2c8" : `hsl(${G.lastHue}, 90%, 70%)`;
     for (const k of ["flare", "lens", "rewind", "nova"]) {
-      $("c-" + k).textContent = G.boosters[k];
+      $("c-" + k).textContent = P.boosters[k];
       const btn = $("b-" + k);
-      btn.disabled = state !== "play" || G.boosters[k] <= 0 || (k === "rewind" && !G.snap) || (k === "flare" && G.light >= 99);
+      btn.disabled = state !== "play" || P.boosters[k] <= 0 || (k === "rewind" && !G.snap) || (k === "flare" && G.fuel >= 99);
       btn.classList.toggle("on", k === "lens" && G.lens > 0);
     }
   }
 
   // ---------- Loop ----------
   newGame();
+  if (dailyPending()) { renderDaily(); show("daily"); } else show("home");
   let lastT = performance.now();
   function frame(now) {
     const dt = Math.min(0.033, (now - lastT) / 1000);
@@ -1321,6 +1648,6 @@
   }
   requestAnimationFrame(frame);
 
-  window.__wake = { get G() { return G; }, get state() { return state; }, begin, release, useBooster, crossed, T, goDark, mistake };
+  window.__wake = { get G() { return G; }, get P() { return P; }, get state() { return state; }, begin, release, useBooster, crossed, T, goDark, mistake, save };
 })();
 </script>

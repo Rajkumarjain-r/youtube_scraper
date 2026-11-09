@@ -1,49 +1,26 @@
-# Wake (prototype v3: the chase)
+# Wake (prototype v4: rocket, aliens, missions and hangar)
 
-An endless one-tap game. Your comet's **Light** is burning out. Hop from star to star to refuel and climb as far as you can before it goes dark.
+An endless one-tap game. Slingshot your rocket from star to star, keep it fuelled, and stay ahead of the alien saucer.
 
 Run it: open `index.html` in any modern browser. Tap / click / Space to release; keys 1–4 for boosters.
 
-## Why each tap matters
-- **Fuel.** Landing on a star absorbs its sparks (1–3 dots) into Light. Used stars turn grey.
-- **Colour chain.** Same colour as your last star raises the chain (×2 … ×8): more Light (+35% per step) and more score. A different colour resets it.
-- **Lasso.** Crossing your trail around unused stars absorbs them all at once (×1.5 Light bonus, score × stars).
-- **Preview.** While orbiting, the dotted line shows exactly what this tap gets: `+6 light · ×3`, `EMPTY`, `DRAINS`, `MISS · drift`, `LASSO ×2` or `SNAG −8`.
+## In a run
+- **Tap** to leave orbit along the dotted line. The label on the target star previews the result: `+6 fuel · ×3 · ◉8`, `EMPTY`, `DRAINS`, `MISS · drift`, `LASSO ×2`, `SNAG −8`.
+- **Fuel** drains constantly. Stars' dots are fuel cells; landing refuels. Same-colour landings build a **chain** (×2…×8) that multiplies fuel and score.
+- **Coins** sit as an arc on part of each star's orbit. Circling longer collects more but burns fuel. Clearing a whole arc pays +10 bonus coins.
+- **Lasso**: cross your exhaust trail around unused stars to take them all at once.
+- **The alien saucer** sits as close as your fuel is low. Mistakes (drift, snag, red dwarf, black hole) cost fuel; a second mistake within 4 s makes the tractor beam lunge for double. Warm-up (first 20 jumps): half cost, no lunges.
+- **Pickups** on the paths between stars: JET (autopilot, no burn), MAG (pulls coins), 2× (double score), SHLD (blocks one mistake).
+- **Pace**: first 20 jumps at 80% speed, then +6% every 20 jumps (cap 1.8×).
+- **Game over** when fuel hits 0 ("Abducted!"). **Second Wind** costs 1 ◆ shard, once per run.
 
-## The chase (step 1 of the "Subway Surfers lessons")
-- **The Devourer** rises from below: a living darkness with eyes. It sits exactly as close as your Light is low, so you can see the danger.
-- **Mistakes feed it** (drift −4, snag −8, red dwarf −4, black-hole core −15). A second mistake within 4 s makes it **lunge** for double cost. During the 20-jump warm-up, mistakes cost half and it never lunges.
-- **Stardust (✦)** streams run along tangent lines between stars, so a well-timed release flies straight through. +2 score and +0.25 Light each. The preview shows how much dust each shot collects. Totals are banked for the future shop.
-- **Pickups** float in space, often on dust streams: **Comet Jet** (7 s autopilot upward, 1.6× speed, no drain, immune to mistakes), **Magnet** (12 s, pulls dust), **2× Score** (15 s), **Shield** (blocks one mistake).
-- **Close shave** +50 for skimming your own trail or a black hole.
-- **Sound**: each colour has a note and chains climb a pentatonic scale; dust ticks, pickup arpeggios, a growl when it lunges. Mute toggle at top right.
+## Between runs (saved in the browser)
+- **Missions**: 3 at a time, mostly "in one run". Finishing a set gives +1 permanent score multiplier (cap ×30), +1 ◆ and +250 ◉. Targets get harder every 2 sets.
+- **Hangar**:
+  - Rockets (cosmetic, each with its own exhaust trail): Pathfinder (free), Ember 1,500, Aurora 3,000, Phantom 4,500, Gold Rush 8,000.
+  - Upgrades (5 levels: 300 / 700 / 1,500 / 3,000 / 6,000): Comet Jet, Magnet, 2× Score duration, Bigger tank (starting fuel).
+  - Boosters: Flare 400, Lens 400, Rewind 500, Nova 700. Booster counts persist; +1 random booster per rocket level in a run.
+- **Daily reward**: 7-day streak (100, 200, 300, 1 ◆, 500, 800, 1,500 + one of each booster). Missing a day resets the streak.
+- Real-money coin packs are not implemented.
 
-## Mistakes are setbacks, not deaths
-| Mistake | Cost |
-|---|---|
-| Miss | You drift (−5 Light/s) until the nearest star reels you in |
-| Wrong colour | Chain resets |
-| Crossing trail around nothing | Snag, −8 Light |
-| Red dwarf (sector 2+) | Drains −7 Light/s while orbiting, breaks chain |
-| Black hole core (sector 3+) | −15 Light, flung away |
-
-## Pace
-- **Warm-up:** the first 20 jumps (landings) run at 80% speed and 80% Light drain so new players can learn.
-- After that the pace eases to 100%, then **+6% every 20 jumps**, capped at 1.8×. A banner announces each step.
-- Stars' catch radius grows a little with speed so fast shots still land.
-
-## Growth and the end
-- Light drains constantly: 1.6/s, +12% per comet level, +6% per sector.
-- Absorbed Light fills XP. Each **comet level**: bigger catch radius, hotter burn, +1 random booster.
-- **Sectors** every 2,600 px: 2 red dwarfs, 3 black holes, 4 colour clusters, 5+ deep space.
-- **Game over:** Light hits 0. Score = distance/10 + spark score. One **Second Wind** per run relights at 30%.
-
-## Boosters (start with 2 each; +1 random per level)
-| Booster | Effect |
-|---|---|
-| Flare | +50 Light instantly |
-| Gravity Lens | Next 3 shots home onto a good star (prefers your chain colour) |
-| Rewind | Undo the last tap: position, Light, chain and used stars restored |
-| Supernova | Absorb every unused star within range and wipe the whole trail |
-
-All balance numbers live in the `T` object at the top of the script.
+All balance numbers live in `T`, `UPG`, `BOOST`, `ROCKETS`, `DAILY` and `MISSIONS` at the top of the script.
