@@ -1,4 +1,4 @@
-# Wake (prototype v2: burning out)
+# Wake (prototype v3: the chase)
 
 An endless one-tap game. Your comet's **Light** is burning out. Hop from star to star to refuel and climb as far as you can before it goes dark.
 
@@ -9,6 +9,14 @@ Run it: open `index.html` in any modern browser. Tap / click / Space to release;
 - **Colour chain.** Same colour as your last star raises the chain (×2 … ×8): more Light (+35% per step) and more score. A different colour resets it.
 - **Lasso.** Crossing your trail around unused stars absorbs them all at once (×1.5 Light bonus, score × stars).
 - **Preview.** While orbiting, the dotted line shows exactly what this tap gets: `+6 light · ×3`, `EMPTY`, `DRAINS`, `MISS · drift`, `LASSO ×2` or `SNAG −8`.
+
+## The chase (step 1 of the "Subway Surfers lessons")
+- **The Devourer** rises from below: a living darkness with eyes. It sits exactly as close as your Light is low, so you can see the danger.
+- **Mistakes feed it** (drift −4, snag −8, red dwarf −4, black-hole core −15). A second mistake within 4 s makes it **lunge** for double cost. During the 20-jump warm-up, mistakes cost half and it never lunges.
+- **Stardust (✦)** streams run along tangent lines between stars, so a well-timed release flies straight through. +2 score and +0.25 Light each. The preview shows how much dust each shot collects. Totals are banked for the future shop.
+- **Pickups** float in space, often on dust streams: **Comet Jet** (7 s autopilot upward, 1.6× speed, no drain, immune to mistakes), **Magnet** (12 s, pulls dust), **2× Score** (15 s), **Shield** (blocks one mistake).
+- **Close shave** +50 for skimming your own trail or a black hole.
+- **Sound**: each colour has a note and chains climb a pentatonic scale; dust ticks, pickup arpeggios, a growl when it lunges. Mute toggle at top right.
 
 ## Mistakes are setbacks, not deaths
 | Mistake | Cost |
