@@ -305,6 +305,7 @@
     flare: 50, novaRadius: 280, lensShots: 3,
     revive: 40, reviveGrace: 3, holeGrace: 1.5,
     holePull: 0.45, holeReach: 1.8, holeCore: 0.3,
+    holeSpacing: 520,             // black holes are never closer than this to each other, so they can't wall off the path
   };
   const HUES = [200, 45, 330, 150];
   const UPG = {
@@ -544,13 +545,16 @@
       const count = Math.random() < 0.6 ? 1 : 2;
       for (let k = 0; k < count; k++) {
         const r = Math.random();
-        const type = r < pHole ? "hole" : "star";
+        let type = r < pHole ? "hole" : "star";
+        // never two black holes near each other: one hole per stretch of space
+        if (type === "hole" && G.stars.some((o) => o.type === "hole" && Math.abs(o.y - (G.genY + band / 2)) < T.holeSpacing * S)) type = "star";
         const hi = Math.random() < bias ? G.genHue : (Math.random() * HUES.length) | 0;
         for (let tries = 0; tries < 14; tries++) {
           const s = newStar(0, 0, type, hi);
           const m = s.capR * 1.2 + 6;
           s.x = rand(m, PW - m);
           s.y = G.genY + rand(0, band);
+          if (type === "hole" && G.stars.some((o) => o.type === "hole" && Math.hypot(o.x - s.x, o.y - s.y) < T.holeSpacing * S)) continue;
           if (G.stars.every((o) => Math.hypot(o.x - s.x, o.y - s.y) > (o.capR + s.capR) * 0.95)) {
             G.stars.push(s);
             if (type === "star") { G.genHue = hi; if (Math.random() < T.pickupChance) s.pickup = randomPickup(); }
@@ -803,7 +807,7 @@
     }
     const coinsLeft = target ? target.coins.filter((k) => !k.taken).length : 0;
     const pickup = target && target.pickup ? target.pickup : null;
-    const holes = G.stars.filter((h) => h.type === "hole" && distSeg(h, a, end) < h.capR * 1.3);
+    const holes = G.power.jet > 0 ? [] : G.stars.filter((h) => h.type === "hole" && distSeg(h, a, end) < h.capR * 1.3);
     G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft, holes, pickup, dist: Math.hypot(end.x - c.x, end.y - c.y) };
   }
 
@@ -898,6 +902,7 @@
         const dx = s.x - c.x, dy = s.y - c.y, d = Math.hypot(dx, dy);
         if (s.type === "hole") {
           s.cool = Math.max(0, s.cool - dt);
+          if (G.power.jet > 0) continue; // JET flies straight through black holes
           if (d < s.capR * T.holeReach) c.inHole = true;
           if (c.burnT > 0) continue;
           if (d < s.capR * T.holeReach && d > 1) {

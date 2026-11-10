@@ -14,7 +14,7 @@ Run it: open `index.html` in any modern browser. Tap / click / Space to release;
 - **Engine burn**: when a black hole is pulling you or you're drifting, tap to burn (−4 fuel) toward the nearest safe star. If you sit in a pull for 1.8 s the rocket auto-ejects. Looping around a black hole never counts as a snag or a drift.
 - **Pickups** sit in the centre of about 1 in 8 stars: JET (autopilot, no burn, rarest), MAG (pulls coins), 2× (double score), SHLD (blocks one mistake). Land on the star to collect it. The star's core shows the pickup with a glow and beacon ring, and the preview label adds `+JET`/`+MAG`/`+2×`/`+SHLD` when you're aiming at it.
 - **Pace**: first 20 jumps at 80% speed, then +6% every 20 jumps (cap 1.8×).
-- **Black holes** (sector 2+): gentle pull (0.45 strength, 1.8× reach), small core. A hit costs 10 fuel, throws you toward the nearest safe star and gives 1.5 s of protection, so one hit is one mistake. The preview marks holes on your path with PULL!
+- **Black holes** (sector 2+): never closer than 520 px to each other, so two can't wall off the path. JET flies straight through them (no pull, no hit). Gentle pull (0.45 strength, 1.8× reach), small core. A hit costs 10 fuel, throws you toward the nearest safe star and gives 1.5 s of protection, so one hit is one mistake. The preview marks holes on your path with PULL!
 - **Game over** when fuel hits 0 ("Abducted!"). **Second Wind** costs 1 ◆ shard, once per run: you restart in orbit around the nearest safe star with 40 fuel, a cleared trail, the saucer pushed back and 3 s of protection.
 
 ## Between runs (saved in the browser)
