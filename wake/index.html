@@ -287,6 +287,8 @@
     lane: 0.78,                   // orbit radius settles to this fraction of the catch ring (coins sit here)
     orbitMinFrac: 0.55, bend: 0,      // stars no longer curve your flight, so the preview line is exact
     catchSlack: 1.06,             // real catch ring is a touch wider than the one the preview tests, so a predicted hit always lands
+    ringGrowMax: 1.25,            // catch rings grow with level and speed, but never past this
+    ringGap: 1.3,                 // stars are placed this far apart (× their two ring sizes), so rings never overlap even at full growth
     fuelStart: 60,
     drainBase: 1.6, drainPerLevel: 0.12, drainPerSector: 0.06,
     driftDrain: 5, dwarfDrain: 7,
@@ -490,7 +492,7 @@
 
   const sectorAt = (y) => 1 + Math.floor(Math.max(0, G.startY - y) / (T.sectorLen * S));
   const speedTarget = () => G.jumps < T.calmJumps ? T.calmMult : Math.min(T.speedMax, 1 + T.stepMult * Math.floor((G.jumps - T.calmJumps) / T.stepJumps));
-  const captureR = (s) => s.capR * (1 + T.capPerLevel * (G.level - 1)) * (1 + 0.5 * Math.max(0, G.speedCur - 1));
+  const captureR = (s) => s.capR * Math.min(T.ringGrowMax, (1 + T.capPerLevel * (G.level - 1)) * (1 + 0.5 * Math.max(0, G.speedCur - 1)));
   const speedNow = () => T.speed * S * G.speedCur * (G.power.jet > 0 ? T.jetSpeed : 1);
   const drainNow = () => T.drainBase * Math.min(1, G.speedCur) * (1 + T.drainPerLevel * (G.level - 1)) * (1 + T.drainPerSector * (G.sector - 1));
   const laneR = (s) => clamp(T.lane * captureR(s), s.core * 2.5, Math.min(s.x - 6, PW - s.x - 6));
@@ -555,7 +557,7 @@
           s.x = rand(m, PW - m);
           s.y = G.genY + rand(0, band);
           if (type === "hole" && G.stars.some((o) => o.type === "hole" && Math.hypot(o.x - s.x, o.y - s.y) < T.holeSpacing * S)) continue;
-          if (G.stars.every((o) => Math.hypot(o.x - s.x, o.y - s.y) > (o.capR + s.capR) * 0.95)) {
+          if (G.stars.every((o) => Math.hypot(o.x - s.x, o.y - s.y) > (o.capR + s.capR) * T.ringGap)) {
             G.stars.push(s);
             if (type === "star") { G.genHue = hi; if (Math.random() < T.pickupChance) s.pickup = randomPickup(); }
             break;
@@ -828,6 +830,7 @@
     // a shot the preview says will land never counts as a drift before it has had time to arrive
     const P0 = G.preview;
     c.planT = P0 && P0.target ? P0.dist / v + 0.6 : T.missTime;
+    c.inside = G.stars.filter((s) => s !== c.star && s.type !== "hole" && Math.hypot(c.x - s.x, c.y - s.y) < captureR(s) * T.catchSlack);
     c.mode = "free"; c.ignore = c.star; c.star = null; c.freeT = 0; c.drifting = false;
     G.hintT = Math.min(G.hintT, 0.5);
     sfx("release");
@@ -916,7 +919,7 @@
             const safe = nearestCapturable(c);
             if (safe) { const sx = safe.x - c.x, sy = safe.y - c.y, sd = Math.hypot(sx, sy) || 1; c.vx = (sx / sd) * v; c.vy = (sy / sd) * v; c.homing = safe; }
             else { c.vx = (-dx / d) * v; c.vy = (-dy / d) * v; }
-            c.freeT = 0; c.drifting = false; c.ignore = null; c.planT = 0;
+            c.freeT = 0; c.drifting = false; c.ignore = null; c.planT = 0; c.inside = [];
           } else if (!s.shaved && d < s.capR * 0.75 && d > s.capR * T.holeCore + 4 && state === "play") { s.shaved = true; closeShave(c); }
         } else if (d < s.capR * 1.5 && d > 1) {
           const a = T.bend * v * v / d * (s.capR / d) * (s.capR / d);
@@ -942,8 +945,9 @@
       addTrail(c.x, c.y);
       if (state !== "play") return;
       if (c.ignore && Math.hypot(c.x - c.ignore.x, c.y - c.ignore.y) > captureR(c.ignore) * T.catchSlack * 1.05) c.ignore = null;
+      if (c.inside && c.inside.length) c.inside = c.inside.filter((s) => Math.hypot(c.x - s.x, c.y - s.y) < captureR(s) * T.catchSlack * 1.05);
       for (const s of G.stars) {
-        if (s === c.ignore || s.type === "hole") continue;
+        if (s === c.ignore || s.type === "hole" || (c.inside && c.inside.includes(s))) continue;
         if (Math.hypot(c.x - s.x, c.y - s.y) < captureR(s) * T.catchSlack) { capture(s); break; }
       }
     }
@@ -965,7 +969,7 @@
     if (t) { dx = t.x - c.x; dy = t.y - c.y; c.homing = t; }
     const d = Math.hypot(dx, dy) || 1;
     c.vx = (dx / d) * v; c.vy = (dy / d) * v;
-    c.burnT = T.burnTime; c.holeT = 0; c.drifting = false; c.freeT = 0; c.ignore = null; c.planT = 0;
+    c.burnT = T.burnTime; c.holeT = 0; c.drifting = false; c.freeT = 0; c.ignore = null; c.planT = 0; c.inside = [];
     G.grace = Math.max(G.grace, 1);
     if (!auto) G.fuel -= T.burnCost;
     addText(c.x, c.y - 26, auto ? ["AUTO-EJECT"] : ["ENGINE BURN", "−" + T.burnCost + " fuel"], "#ffa45c", 1.0);

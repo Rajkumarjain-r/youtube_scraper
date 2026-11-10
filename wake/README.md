@@ -5,7 +5,7 @@ An endless one-tap game. Slingshot your rocket from star to star, keep it fuelle
 Run it: open `index.html` in any modern browser. Tap / click / Space to release; keys 1–4 for boosters.
 
 ## In a run
-- **Tap** to leave orbit along the dotted line. Stars no longer bend your flight, so the line is exactly where you go (only black holes pull, marked PULL!). If the preview names a star, you land on it.
+- **Tap** to leave orbit along the dotted line. Stars no longer bend your flight, so the line is exactly where you go (only black holes pull, marked PULL!). If the preview names a star, you land on it. Stars are spaced so their catch rings never overlap (rings grow at most 1.25× during a run), and when you tap, any star whose ring you're already inside is ignored until you've left it, so a tap never snaps you back to a neighbour.
    The label on the target star previews the result: `+6 fuel · ×3 · ◉8`, `EMPTY`, `DRAINS`, `MISS · drift`, `LASSO ×2`, `SNAG −8`.
 - **Fuel** drains constantly. Stars' dots are fuel cells; landing refuels. Same-colour landings build a **chain** (×2…×8) that multiplies fuel and score.
 - **Coins** sit as an arc on part of each star's orbit. Circling longer collects more but burns fuel. Clearing a whole arc pays +10 bonus coins.
