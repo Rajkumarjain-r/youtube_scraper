@@ -167,7 +167,7 @@
     <div class="meter" id="meter"><i id="fuelbar"></i></div>
     <div class="xp" title="Progress to next rocket level"><i id="xpbar"></i></div>
   </div>
-  <div class="stat right"><span class="label">Chain</span><span class="value chain"><i id="chaindot"></i><span id="chain">×1</span></span></div>
+  <div class="stat right"><span class="label">Chain</span><span class="value chain"><i id="chaindot"></i><span id="chain">×1</span></span><span class="coins" id="streak"></span></div>
 </div>
 <button class="mute" id="mute" type="button" aria-pressed="false">Sound on</button>
 
@@ -200,6 +200,8 @@
     <div class="actions">
       <button class="go" id="start" type="button">Launch</button>
       <div class="row"><button class="ghost" id="open-hangar" type="button">Hangar</button><button class="ghost" id="open-help" type="button">How to play</button></div>
+      <button class="ghost" id="toggle-rush" type="button" aria-pressed="true">Rush mode: on</button>
+      <p class="lede small" id="rush-note"></p>
     </div>
   </div>
 </div>
@@ -211,6 +213,7 @@
     <ul class="rules">
       <li><b>Tap</b><span>Leave orbit along the dotted line. The label on the target star shows what that tap gets you.</span></li>
       <li><b class="gold">Fuel</b><span>The dots around a star are fuel cells. Land on it to refuel. Grey stars are empty.</span></li>
+      <li><b class="gold">Perfect</b><span>Rush mode: bright cyan arcs on your orbit mark a PERFECT release. Tap there within your first lap for bonus fuel, a speed burst and a streak. Circle too long and the mothership gains.</span></li>
       <li><b class="gold">Chain</b><span>Land on the same colour again and again to multiply fuel and score.</span></li>
       <li><b class="gold">Coins</b><span>Coins sit on part of each orbit. Circle longer to grab them, but every second burns fuel.</span></li>
       <li><b class="gold">Lasso</b><span>Cross your exhaust trail around stars to take them all at once. Crossing your trail is otherwise harmless.</span></li>
@@ -287,6 +290,11 @@
     lane: 0.78,                   // orbit radius settles to this fraction of the catch ring (coins sit here)
     orbitMinFrac: 0.55, bend: 0,      // stars no longer curve your flight, so the preview line is exact
     catchSlack: 1.06,             // real catch ring is a touch wider than the one the preview tests, so a predicted hit always lands
+    // Rush mode (experiment): harder fuel swings + rewards for fast, accurate releases
+    rushDrain: 2.2, rushCell: 2,          // fuel burns this much faster, stars refuel this much more
+    quickTurns: 1.25,                     // release within this many laps of landing to count as quick
+    perfectPerp: 0.6,                     // shot passes within this fraction of the target's ring from its centre
+    perfectFuel: 4, greatFuel: 1.5, perfectBoost: 1.4, greatBoost: 1.15, perfectScore: 25,
     ringGrowMax: 1.25,            // catch rings grow with level and speed, but never past this
     ringGap: 1.3,                 // stars are placed this far apart (× their two ring sizes), so rings never overlap even at full growth
     fuelStart: 60,
@@ -360,7 +368,7 @@
     coins: 0, shards: 3, best: 0, mult: 1, set: 0, missions: null, pendingNew: false,
     upgrades: { jet: 0, magnet: 0, twin: 0, fuel: 0 },
     boosters: { flare: 3, lens: 3, rewind: 3, nova: 3 },
-    owned: ["pathfinder"], rocket: "pathfinder", daily: { last: "", streak: 0 },
+    owned: ["pathfinder"], rocket: "pathfinder", daily: { last: "", streak: 0 }, rush: true,
   });
   let P = DEF();
   try {
@@ -445,6 +453,8 @@
       case "mission": [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, "triangle", 0.07, 0, i * 0.07)); break;
       case "dark": tone(200, 1.3, "sine", 0.12, 3); break;
       case "boost": tone(660, 0.25, "sine", 0.07, 1.5); break;
+      case "perfect": { const f = 660 * Math.pow(2, Math.min(arg, 10) / 12); tone(f, 0.16, "triangle", 0.09); tone(f * 1.5, 0.2, "triangle", 0.07, 0, 0.07); break; }
+      case "great": tone(700, 0.1, "triangle", 0.05); break;
       case "burn": tone(90, 0.45, "sawtooth", 0.09, 2.6); tone(180, 0.3, "triangle", 0.05, 2); break;
       case "buy": tone(880, 0.12, "triangle", 0.07); tone(1320, 0.18, "triangle", 0.06, 0, 0.08); break;
     }
@@ -493,8 +503,8 @@
   const sectorAt = (y) => 1 + Math.floor(Math.max(0, G.startY - y) / (T.sectorLen * S));
   const speedTarget = () => G.jumps < T.calmJumps ? T.calmMult : Math.min(T.speedMax, 1 + T.stepMult * Math.floor((G.jumps - T.calmJumps) / T.stepJumps));
   const captureR = (s) => s.capR * Math.min(T.ringGrowMax, (1 + T.capPerLevel * (G.level - 1)) * (1 + 0.5 * Math.max(0, G.speedCur - 1)));
-  const speedNow = () => T.speed * S * G.speedCur * (G.power.jet > 0 ? T.jetSpeed : 1);
-  const drainNow = () => T.drainBase * Math.min(1, G.speedCur) * (1 + T.drainPerLevel * (G.level - 1)) * (1 + T.drainPerSector * (G.sector - 1));
+  const speedNow = () => T.speed * S * G.speedCur * (G.power.jet > 0 ? T.jetSpeed : 1) * (G.c.boost || 1);
+  const drainNow = () => T.drainBase * (P.rush ? T.rushDrain : 1) * Math.min(1, G.speedCur) * (1 + T.drainPerLevel * (G.level - 1)) * (1 + T.drainPerSector * (G.sector - 1));
   const laneR = (s) => clamp(T.lane * captureR(s), s.core * 2.5, Math.min(s.x - 6, PW - s.x - 6));
 
   function newStar(x, y, type = "star", hueIdx = 0) {
@@ -524,7 +534,7 @@
       chain: 1, lastHue: first.hue, sector: 1, mult: P.mult,
       stars: [first], genY: -first.capR * 1.2, genHue: 0, trail: [], parts: [], texts: [], flashes: [], rings: [], pickups: [],
       camTop: -H * 0.58, startY: 0, maxClimb: 0, shake: 0, darkT: 0, banner: null, hintT: 9,
-      lens: 0, snap: null, revived: false, preview: null, jumps: 0, speedCur: T.calmMult,
+      lens: 0, snap: null, revived: false, preview: null, jumps: 0, speedCur: T.calmMult, streak: 0, bestStreak: 0, sweet: null,
       power: { jet: 0, magnet: 0, twin: 0, shield: 0 }, hunt: 0, lunge: 0, devGap: H * 0.6, shaveCd: 0, shipX: PW / 2,
       coinsRun: 0, coinsBanked: 0, grace: 0,
       stats: { coins: 0, chain: 1, lasso: 0, jumps: 0, sector: 1, pickups: 0, shaves: 0, rings: 0, score: 0, clean: 0 }, clean: 0,
@@ -626,7 +636,7 @@
       }
     }
     if (!sp) return { fuel: 0, score: 0 };
-    const fuel = sp * T.cellFuel * (1 + T.chainFuelStep * (G.chain - 1)) * (lassoN > 1 ? T.lassoBonus : 1);
+    const fuel = sp * T.cellFuel * (P.rush ? T.rushCell : 1) * (1 + T.chainFuelStep * (G.chain - 1)) * (lassoN > 1 ? T.lassoBonus : 1);
     const score = sp * T.cellScore * G.chain * Math.max(1, lassoN) * twinM();
     addFuel(fuel);
     G.cellScore += score;
@@ -643,6 +653,7 @@
       return;
     }
     const warm = G.jumps < T.calmJumps;
+    G.streak = 0;
     const lunge = !warm && G.hunt > 0;
     const c = cost * (lunge ? 2 : warm ? 0.5 : 1);
     G.fuel -= c;
@@ -769,6 +780,36 @@
     return bestS;
   }
 
+  // The first star a straight shot from (px,py) along (tx,ty) would land on, and how central the hit is.
+  function shotAt(px, py, tx, ty, from) {
+    let target = null, tHit = 520 * S, perpN = 1;
+    for (const s of G.stars) {
+      if (s === from || s.type === "hole") continue;
+      const fx = s.x - px, fy = s.y - py, along = fx * tx + fy * ty;
+      if (along <= 0) continue;
+      const cr = captureR(s), r = cr * T.catchSlack * 0.97, perp2 = fx * fx + fy * fy - along * along;
+      if (perp2 > r * r) continue;
+      const tEnter = along - Math.sqrt(r * r - perp2);
+      if (tEnter > 0 && tEnter < tHit) { tHit = tEnter; target = s; perpN = Math.sqrt(Math.max(0, perp2)) / cr; }
+    }
+    return { target, tHit, perpN };
+  }
+
+  // Rush mode: mark the stretches of the current orbit where releasing gives a PERFECT (2) or GREAT (1).
+  function computeSweet() {
+    const c = G.c;
+    G.sweet = null;
+    if (!P.rush || state !== "play" || c.mode !== "orbit" || G.power.jet > 0 || G.lens > 0) return;
+    const N = 90, step = TAU / N, arr = [];
+    for (let i = 0; i < N; i++) {
+      const a = c.ang + c.dir * i * step;
+      const px = c.star.x + Math.cos(a) * c.R, py = c.star.y + Math.sin(a) * c.R;
+      const sh = shotAt(px, py, c.dir * -Math.sin(a), c.dir * Math.cos(a), c.star);
+      arr.push(sh.target && sh.target.type === "star" && !sh.target.used ? (sh.perpN < T.perfectPerp ? 2 : 1) : 0);
+    }
+    G.sweet = { arr, step, left: T.quickTurns * TAU - c.turn };
+  }
+
   function computePreview() {
     const c = G.c;
     if (c.mode !== "orbit" || state !== "play") { G.preview = null; return; }
@@ -778,16 +819,10 @@
       const s = lensTarget(c, tx, ty, G.power.jet > 0); // show where the autopilot or lens will really take you
       if (s) { target = s; homing = true; tHit = Math.hypot(s.x - c.x, s.y - c.y) - captureR(s) * 0.8; }
     }
+    let perpN = 1;
     if (!target) {
-      for (const s of G.stars) {
-        if (s === c.star || s.type === "hole") continue;
-        const fx = s.x - c.x, fy = s.y - c.y, along = fx * tx + fy * ty;
-        if (along <= 0) continue;
-        const r = captureR(s) * T.catchSlack * 0.97, perp2 = fx * fx + fy * fy - along * along;
-        if (perp2 > r * r) continue;
-        const tEnter = along - Math.sqrt(r * r - perp2);
-        if (tEnter > 0 && tEnter < tHit) { tHit = tEnter; target = s; }
-      }
+      const sh = shotAt(c.x, c.y, tx, ty, c.star);
+      target = sh.target; tHit = sh.tHit; perpN = sh.perpN;
     }
     const end = homing ? { x: target.x, y: target.y } : { x: c.x + tx * tHit, y: c.y + ty * tHit };
     let cross = null;
@@ -810,7 +845,7 @@
     const coinsLeft = target ? target.coins.filter((k) => !k.taken).length : 0;
     const pickup = target && target.pickup ? target.pickup : null;
     const holes = G.power.jet > 0 ? [] : G.stars.filter((h) => h.type === "hole" && distSeg(h, a, end) < h.capR * 1.3);
-    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft, holes, pickup, dist: Math.hypot(end.x - c.x, end.y - c.y) };
+    G.preview = { tx, ty, target, end, cross, homing, miss: !target, coins: coinsLeft, holes, pickup, dist: Math.hypot(end.x - c.x, end.y - c.y), perpN };
   }
 
   // ---------- Rocket ----------
@@ -821,6 +856,33 @@
       c: { ...c }, fuel: G.fuel, chain: G.chain, lastHue: G.lastHue, cellScore: G.cellScore,
       totalFuel: G.totalFuel, level: G.level, nextLevelAt: G.nextLevelAt, jumps: G.jumps, trail: G.trail.slice(), used: [],
     };
+    // Rush mode: grade the release
+    c.boost = 1;
+    if (P.rush && G.power.jet <= 0 && G.lens <= 0) {
+      const P1 = G.preview, t = P1 && P1.target;
+      const fresh = t && t.type === "star" && !t.used;
+      const quick = c.turn < T.quickTurns * TAU;
+      const tier = fresh && quick ? (P1.perpN < T.perfectPerp ? 2 : 1) : 0;
+      if (tier === 2) {
+        G.streak++;
+        G.bestStreak = Math.max(G.bestStreak, G.streak);
+        const bonus = T.perfectFuel + 0.5 * Math.min(G.streak, 6);
+        addFuel(bonus);
+        G.cellScore += T.perfectScore * Math.min(G.streak, 10) * twinM();
+        c.boost = T.perfectBoost;
+        addText(c.x, c.y - 30, [G.streak > 1 ? "PERFECT ×" + G.streak : "PERFECT", "+" + Math.round(bonus) + " fuel"], "#7df9ff", 1.1);
+        G.rings.push({ x: c.x, y: c.y, r: 10, life: 1, hue: 45, max: 70 * S });
+        sfx("perfect", G.streak);
+      } else if (tier === 1) {
+        addFuel(T.greatFuel);
+        c.boost = T.greatBoost;
+        addText(c.x, c.y - 30, ["GREAT"], "#bfe8ff", 0.8);
+        sfx("great");
+      } else {
+        if (G.streak > 1) addText(c.x, c.y - 30, ["streak lost"], "#9aa2c8", 0.9);
+        G.streak = 0;
+      }
+    }
     const v = speedNow();
     c.vx = c.dir * -Math.sin(c.ang) * v;
     c.vy = c.dir * Math.cos(c.ang) * v;
@@ -847,7 +909,7 @@
     c.ang = Math.atan2(ry, rx);
     c.dir = rx * c.vy - ry * c.vx >= 0 ? 1 : -1;
     c.x = s.x + Math.cos(c.ang) * c.R; c.y = s.y + Math.sin(c.ang) * c.R;
-    c.acc = 0;
+    c.acc = 0; c.turn = 0; c.boost = 1;
     addTrail(c.x, c.y);
     c.orbitIdx = G.trail.length - 1;
     s.pulse = Math.max(s.pulse, 0.5);
@@ -883,7 +945,7 @@
       const s = c.star;
       c.R += (laneR(s) - c.R) * Math.min(1, dt * 4); // settle into the coin lane
       const w = (v / c.R) * c.dir;
-      c.ang += w * dt; c.acc += w * dt;
+      c.ang += w * dt; c.acc += w * dt; c.turn = (c.turn || 0) + Math.abs(w * dt);
       c.x = s.x + Math.cos(c.ang) * c.R; c.y = s.y + Math.sin(c.ang) * c.R;
       addTrail(c.x, c.y);
       if (state === "play") {
@@ -1208,6 +1270,16 @@
   $("over-hangar").addEventListener("click", () => { backTo = "over-done"; show("hangar"); });
   $("close-hangar").addEventListener("click", () => show(backTo === "over-done" ? "home" : backTo));
   $("open-help").addEventListener("click", () => show("help"));
+  function syncRush() {
+    const b = $("toggle-rush");
+    b.textContent = "Rush mode: " + (P.rush ? "on" : "off");
+    b.setAttribute("aria-pressed", String(P.rush));
+    $("rush-note").textContent = P.rush
+      ? "Experiment. Cyan arcs mark PERFECT releases. Fuel swings harder and the mothership is always rising."
+      : "Classic rules: no perfect releases, and the mothership only appears after a mistake.";
+  }
+  $("toggle-rush").addEventListener("click", () => { P.rush = !P.rush; save(); syncRush(); });
+  syncRush();
   $("close-help").addEventListener("click", () => show("home"));
   $("over-home").addEventListener("click", () => { state = "menu"; newGame(); show("home"); });
 
@@ -1303,10 +1375,11 @@
     if (drop > 0) { G.trail.splice(0, drop); c.orbitIdx = Math.max(0, c.orbitIdx - drop); if (G.snap) G.snap = null; }
 
     computePreview();
+    computeSweet();
     G.lunge = Math.max(0, G.lunge - dt * 1.6);
     // the mothership only rises when you slip (or run low), like a chaser in a runner game
     const fuelGap = 10 + (H * 0.42 + 70) * Math.pow(clamp(G.fuel / 100, 0, 1), 0.85);
-    const gapTarget = state === "dark" || state === "over" ? 0 : G.hunt > 0 ? Math.min(fuelGap, H * 0.22) : G.fuel < 20 ? fuelGap : H * 0.95;
+    const gapTarget = state === "dark" || state === "over" ? 0 : P.rush ? fuelGap : G.hunt > 0 ? Math.min(fuelGap, H * 0.22) : G.fuel < 20 ? fuelGap : H * 0.95;
     G.devGap += (gapTarget - G.devGap) * Math.min(1, dt * (state === "dark" ? 3 : 2.5));
     G.shipX += (c.x - G.shipX) * Math.min(1, dt * 1.4);
     G.shake = Math.max(0, G.shake - dt);
@@ -1345,6 +1418,7 @@
     $("r-coins").textContent = "◉ " + fmt(G.coinsRun);
     $("r-dist").textContent = fmt(G.maxClimb / 10);
     $("r-chain").textContent = "×" + G.stats.chain;
+    $("r-why").textContent = "The aliens caught your rocket." + (P.rush ? " Best perfect streak: ×" + G.bestStreak + "." : "");
     $("r-sector").textContent = G.sector;
     $("r-mult").textContent = "Score ×" + P.mult;
     missionItems($("r-missions"));
@@ -1425,6 +1499,24 @@
     ctx.fillText(PTXT[k], s.x, s.y + 0.5);
   }
 
+  function drawSweet() {
+    const sw = G.sweet, c = G.c;
+    if (!sw || c.mode !== "orbit") return;
+    const s = c.star;
+    ctx.lineCap = "butt";
+    for (let i = 0; i < sw.arr.length; i++) {
+      const tier = sw.arr[i];
+      if (!tier) continue;
+      const live = i * sw.step <= sw.left; // still inside the quick window
+      const a1 = c.ang + c.dir * i * sw.step, a2 = a1 + c.dir * sw.step * 1.05;
+      ctx.beginPath(); ctx.arc(s.x, s.y, c.R, a1, a2, c.dir < 0);
+      // cyan, so it can't be mistaken for the gold coins on the same ring
+      if (tier === 2) { ctx.strokeStyle = live ? `rgba(125, 249, 255, ${0.8 + 0.2 * Math.sin(G.t * 10)})` : "rgba(125, 249, 255, 0.16)"; ctx.lineWidth = live ? 8 * S : 4 * S; }
+      else { ctx.strokeStyle = live ? "rgba(233, 236, 255, 0.28)" : "rgba(233, 236, 255, 0.08)"; ctx.lineWidth = 3 * S; }
+      ctx.stroke();
+    }
+  }
+
   function drawPreview() {
     const P2 = G.preview, c = G.c;
     if (!P2 || state !== "play") return;
@@ -1463,7 +1555,7 @@
     else if (s.used) { label = "EMPTY"; color = "#9aa2c8"; }
     else {
       const ch = s.hue === G.lastHue ? Math.min(T.chainMax, G.chain + 1) : 1;
-      const gain = Math.round(s.cells * T.cellFuel * (1 + T.chainFuelStep * (ch - 1)));
+      const gain = Math.round(s.cells * T.cellFuel * (P.rush ? T.rushCell : 1) * (1 + T.chainFuelStep * (ch - 1)));
       label = `+${gain} fuel` + (ch > 1 ? ` · ×${ch}` : G.chain > 1 ? " · resets chain" : "");
       color = `hsl(${s.hue}, 95%, 78%)`;
     }
@@ -1679,6 +1771,7 @@
       ctx.strokeStyle = `rgba(111, 214, 255, ${0.15 + 0.1 * Math.sin(G.t * 6)})`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(c.x, c.y, T.magnetRadius * S, 0, TAU); ctx.stroke();
     }
+    drawSweet();
     drawPreview();
     for (const r of G.rings) {
       ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(1, r.r), 0, TAU);
@@ -1759,6 +1852,7 @@
     const prev = G.nextLevelAt - (T.levelBase + T.levelStep * (G.level - 1));
     $("xpbar").style.width = clamp(((G.totalFuel - prev) / (G.nextLevelAt - prev)) * 100, 0, 100) + "%";
     $("chain").textContent = "×" + G.chain;
+    $("streak").textContent = G.streak > 0 ? "★ ×" + G.streak : "";
     $("chaindot").style.background = G.lastHue == null ? "#9aa2c8" : `hsl(${G.lastHue}, 90%, 70%)`;
     for (const k of ["flare", "lens", "rewind", "nova"]) {
       $("c-" + k).textContent = P.boosters[k];

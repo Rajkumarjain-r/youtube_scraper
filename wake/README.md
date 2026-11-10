@@ -17,6 +17,13 @@ Run it: open `index.html` in any modern browser. Tap / click / Space to release;
 - **Black holes** (sector 2+): never closer than 520 px to each other, so two can't wall off the path. JET flies straight through them (no pull, no hit). Gentle pull (0.45 strength, 1.8× reach), small core. A hit costs 10 fuel, throws you toward the nearest safe star and gives 1.5 s of protection, so one hit is one mistake. The preview marks holes on your path with PULL!
 - **Game over** when fuel hits 0 ("Abducted!"). **Second Wind** costs 1 ◆ shard, once per run: you restart in orbit around the nearest safe star with 40 fuel, a cleared trail, the saucer pushed back and 3 s of protection.
 
+## Rush mode (experiment, on by default; switch on the home screen)
+Built to fix "waiting, not playing":
+- **Perfect release.** Bright cyan arcs on your orbit mark where a tap sends you through the centre of a fresh star (within 0.6 of its ring radius). Tap there within 1.25 laps of landing for a **PERFECT**: +4 fuel (+0.5 per streak step, up to +3), a 1.4× speed burst for that hop, score +25 × streak (capped at ×10), and the streak grows. A quick but off-centre hit on a fresh star is a **GREAT** (+1.5 fuel, 1.15× burst, streak kept). Anything else resets the streak, as does any mistake. Each window is open roughly 100 ms and there are about four per lap.
+- **Always-rising mothership.** Fuel burns 2.2× faster and stars refuel 2× as much, so the meter swings harder; the mothership is always positioned by your fuel instead of hiding until a mistake. Circling visibly costs ground.
+- Bot check (same build): a patient player reached sector 4 with ~3k points; players hitting perfects reached sector 12–13 with 26–36k.
+- Rush off = the previous rules (no perfect grading, mothership only after mistakes).
+
 ## Between runs (saved in the browser)
 - **Missions**: 3 at a time, mostly "in one run". Finishing a set gives +1 permanent score multiplier (cap ×30), +1 ◆ and +250 ◉. Targets get harder every 2 sets. Mission types: coins, chain, lasso, jumps, sector, pickups, clean landing streak, coin rings, score.
 - **Hangar**:
